@@ -46,7 +46,7 @@ limactl create --name=quickddevpreviews https://raw.githubusercontent.com/mandra
 limactl start quickddevpreviews
 limactl shell quickddevpreviews
 # inside the VM:
-curl -fsSL https://raw.githubusercontent.com/mandrasch/quickddevpreviews/quick-ddev-previews/main/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | sudo bash
 ```
 
 The VM template exposes ports 80 and 443 on all interfaces of the Mac, so the
