@@ -121,7 +121,7 @@ esac
 bash "$INSTALL_DIR/scripts/provision-host.sh" < /dev/null
 
 say "Creating $DATA_DIR"
-mkdir -p "$DATA_DIR"
+mkdir -p "$DATA_DIR/.ddev"
 chown -R 1000:1000 "$DATA_DIR"
 mkdir -p "$PROJECTS_DIR"
 chown -R 1000:1000 "$PROJECTS_DIR"
