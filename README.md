@@ -6,7 +6,7 @@ and launch live DDEV previews of any branch.
 
 ## Fork of Knecht Cloud
 
-This project was heavily inspired by https://github.com/knecht-works/knecht-cloud by the amazingly talented Samuel Reichör.
+This project forked some techniques of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör.
 
 ## Install
 
@@ -31,6 +31,66 @@ To use a real domain instead:
 ```bash
 QDP_DOMAIN=previews.example.com bash <(curl -fsSL <repo-url>/scripts/install.sh)
 ```
+
+## Install on macOS (e.g. a Mac mini)
+
+The run substrate (host Docker + ddev) is Linux-only, so on a Mac the same
+setup runs inside a [Lima](https://lima-vm.io) VM. Create the VM from the
+checked-in template, then run the installer inside it:
+
+```bash
+brew install lima
+limactl create --name=quickddevpreviews https://raw.githubusercontent.com/quickddevpreviews/quickddevpreviews/main/scripts/lima-server.yaml
+limactl start quickddevpreviews
+limactl shell quickddevpreviews
+# inside the VM:
+curl -fsSL https://raw.githubusercontent.com/quickddevpreviews/quickddevpreviews/main/scripts/install.sh | sudo bash
+```
+
+The VM template exposes ports 80 and 443 on all interfaces of the Mac, so the
+post-install steps above apply unchanged, with the home-network additions:
+
+1. Forward TCP ports 80 and 443 on your router to the Mac.
+2. Point the two DNS records at your public IP. Home connections usually change
+   their IP over time, so use a dynamic DNS provider (or a static IP from your
+   ISP) and give the Mac a fixed address in your router.
+
+After a macOS reboot, run `limactl start quickddevpreviews`; the containers
+inside come back up on their own. Updating and backups work exactly as below,
+with `/opt/quickddevpreviews` and `/data/quickddevpreviews` living inside the
+VM (`limactl shell quickddevpreviews`).
+
+### Temporary Local Domain Setup on macOS
+
+To just try quickddevpreviews on a Mac, follow the macOS install above and use
+`lvh.me` as the domain. It resolves to 127.0.0.1, so the dashboard and all
+preview subdomains work without any DNS setup. Ports 80 and 443 on the Mac must
+be free.
+
+Let's Encrypt cannot issue certificates for a local domain, so you need to use
+Caddy's internal CA instead. Inside the VM, edit `/opt/quickddevpreviews/
+Caddyfile` so both site blocks use `tls internal`:
+
+```
+{$QUICKDDEVPREVIEWS_BASE_DOMAIN} {
+	tls internal
+	reverse_proxy quickddevpreviews:3000
+}
+
+https:// {
+	tls internal {
+		on_demand
+	}
+	reverse_proxy quickddevpreviews:3000
+}
+```
+
+Restart Caddy with `cd /opt/quickddevpreviews && sudo docker compose restart caddy`.
+Open `https://lvh.me`, accept the certificate warning and complete the GitHub
+App setup.
+
+> [!TIP]
+> GitHub webhooks cannot reach a local instance, so GitHub triggers won't work.
 
 ## Development
 
