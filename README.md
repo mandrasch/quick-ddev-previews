@@ -15,13 +15,18 @@ This project forked some techniques of https://github.com/knecht-works/knecht-cl
 On a fresh Ubuntu 24.04 server (as root):
 
 ```bash
-curl -fsSL https://github.com/mandrasch/quick-ddev-previews/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | bash
 ```
 
 The installer auto-derives the domain from the server's public IP via
 [sslip.io](https://sslip.io) (e.g. `1-2-3-4.sslip.io`), so no DNS setup is
 needed. It installs Docker, clones the repo, writes `.env`, and starts the app
 with Caddy TLS.
+
+> **Image builds from source for now.** No release image is published yet, so
+> the installer builds the app image on the server from the cloned checkout
+> (`docker compose up -d --build`). A published image (via a GitHub Actions
+> release pipeline) is planned for later; see AGENTS.md.
 
 Then:
 

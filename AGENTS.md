@@ -112,6 +112,29 @@ Caddy (TLS) --reverse_proxy--> quickddevpreviews:3000 (Nitro)
 - [ ] Retry / reboot / cancel buttons on the run page
 - [ ] Web terminal + SSH into the run
 
+## Phase 4 next: publish the Docker image via GitHub Actions (not started)
+
+The installer currently builds the app image **from source** on the server
+(scripts/install.sh falls back to `docker compose up -d --build` when
+`docker compose pull` fails), so a fresh VPS works without any published
+image. That is intentional for now.
+
+Before production hosting, add the image-publishing pipeline the reference
+project uses (see `_reference-project/knecht-cloud/.github/workflows/release.yml`):
+
+- [ ] `.github/workflows/release.yml`: on `push` of tags `v*.*.*`, build the
+  `prod` Dockerfile target natively on amd64 + arm64, pass
+  `QUICKDDEVPREVIEWS_VERSION=${{ github.ref_name }}`, push
+  `ghcr.io/<owner>/quick-ddev-previews:<tag>-<arch>`, merge to a multi-arch
+  manifest under `<tag>` (+ `latest` for stable), create a GitHub Release with
+  the conventional-commit changelog
+- [ ] `.github/workflows/test.yml`: lint + typecheck + vitest on push to main
+  and pull requests
+- [ ] Set the GHCR package to **public** after the first release push (or
+  anonymous pulls on fresh servers fail)
+- [ ] Update `docker-compose.yml` image name from the placeholder to
+  `ghcr.io/<owner>/quick-ddev-previews:${QUICKDDEVPREVIEWS_VERSION:-latest}`
+
 ## Decisions
 
 - Service name: `quickddevpreviews` (Linux user, container, install dir)
@@ -121,3 +144,5 @@ Caddy (TLS) --reverse_proxy--> quickddevpreviews:3000 (Nitro)
 - Password reset: CLI command inside the container, not email-based
 - Lime primary color (carried over from the reference project)
 - Settings/invites UI only visible to the owner
+- Installer builds from source until a release image is published (GH Actions
+  pipeline is a Phase 4 task, see above)

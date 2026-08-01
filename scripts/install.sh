@@ -75,7 +75,9 @@ if [ -n "${QDP_REF:-}" ]; then
   esac
   echo "⚠ QDP_REF=$QDP_REF (testing mode, image tag: $IMAGE_TAG)"
 else
-  TAG="$(git -C "$INSTALL_DIR" tag --list 'v*.*.*' | grep -v -- - | sort -V | tail -n1)"
+  # `|| true`: with set -euo pipefail, an empty tag list makes `grep -v` exit 1
+  # (nothing matched), which would kill the install before the fallback below.
+  TAG="$(git -C "$INSTALL_DIR" tag --list 'v*.*.*' | grep -v -- - | sort -V | tail -n1 || true)"
   if [ -z "$TAG" ]; then
     TAG="main"
     IMAGE_TAG="latest"
