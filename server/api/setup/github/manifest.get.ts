@@ -50,7 +50,10 @@ export default defineEventHandler(async (event) => {
       metadata: 'read',
       pull_requests: 'write',
     },
-    default_events: ['pull_request'],
+    // No default_events / hook_attributes: GitHub requires a non-blank webhook
+    // URL when events are specified, but the webhook endpoint doesn't exist
+    // yet (Phase 3). The app permissions alone enable repo access (clone, PRs).
+    // Webhook events + the /api/github/webhook endpoint land in Phase 3.
   }
 
   return {
