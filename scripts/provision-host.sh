@@ -58,39 +58,52 @@ if id -u "$SERVICE_USER" >/dev/null 2>&1 && ! id -nG "$SERVICE_USER" | grep -qw 
   sudo usermod -aG docker "$SERVICE_USER"
 fi
 
-# ── 4. ddev global config ─────────────────────────────────────────────────────
-# ddev refuses to run as root, so ddev steps run as the service user (uid 1000,
-# created by install.sh). The global config MUST omit the router before the
-# first start: a router would bind host ports 80/443, which belong to Caddy.
-WARM_HOME="$(getent passwd "$SERVICE_USER" | cut -d: -f6)"
-if [ -n "$WARM_HOME" ]; then
-  sudo -u "$SERVICE_USER" mkdir -p "$WARM_HOME/.ddev"
-  if ! grep -q ddev-router "$WARM_HOME/.ddev/global_config.yaml" 2>/dev/null; then
-    printf 'omit_containers: [ddev-router, ddev-ssh-agent]\nperformance_mode: none\ninstrumentation_opt_in: false\n' \
-      | sudo -u "$SERVICE_USER" tee -a "$WARM_HOME/.ddev/global_config.yaml" >/dev/null
-  fi
-
-  # ── 5. Warm-up ──────────────────────────────────────────────────────────────
-  # One throwaway project start pulls the ddev web/db images (shared by every
-  # run on this host) and initializes the ddev-global-cache volume, whose
-  # first-time setup is NOT safe under parallel project starts.
-  say "Warming the ddev image cache (throwaway project)"
-  WARMUP="$(mktemp -d)"
-  mkdir -p "$WARMUP/public"
-  echo '<?php echo "quickddevpreviews-warmup";' > "$WARMUP/public/index.php"
-  chown -R 1000:1000 "$WARMUP"
-  (
-    cd "$WARMUP"
-    sudo -u "$SERVICE_USER" env -u XDG_CONFIG_HOME HOME="$WARM_HOME" DDEV_NONINTERACTIVE=true \
-      ddev config --project-type=php --docroot=public --project-name=quickddevpreviews-warmup
-    sudo -u "$SERVICE_USER" env -u XDG_CONFIG_HOME HOME="$WARM_HOME" DDEV_NONINTERACTIVE=true \
-      ddev start -y
-    sudo -u "$SERVICE_USER" env -u XDG_CONFIG_HOME HOME="$WARM_HOME" DDEV_NONINTERACTIVE=true \
-      ddev delete --omit-snapshot -y quickddevpreviews-warmup
-  )
-  rm -rf "$WARMUP"
+# ── 4. ddev global config + warm-up ───────────────────────────────────────────
+# ddev refuses to run as root, and install.sh runs this script as root: the
+# ddev steps then run as the `quickddevpreviews` user (uid 1000, created by
+# install.sh). On the dev VM the script runs as the invoking user directly.
+if [ "$(id -u)" = 0 ]; then
+  WARM_USER="quickddevpreviews"
+  id -u "$WARM_USER" >/dev/null 2>&1 || { echo "User quickddevpreviews missing (install.sh creates it)"; exit 1; }
+  usermod -aG docker "$WARM_USER"
+  # env -u XDG_CONFIG_HOME: runuser goes through pam_env, which loads
+  # /etc/environment; GitHub runners point XDG_CONFIG_HOME at the runner
+  # user's home there, and ddev would prefer that (unreadable) path over
+  # ~/.ddev for its global config.
+  as_warm_user() { runuser -u "$WARM_USER" -- env -u XDG_CONFIG_HOME HOME="$(getent passwd "$WARM_USER" | cut -d: -f6)" DDEV_NONINTERACTIVE=true "$@"; }
+else
+  WARM_USER="$(id -un)"
+  # `sg docker` so a just-added group membership works without re-login.
+  as_warm_user() { sg docker -c "DDEV_NONINTERACTIVE=true $*" 2>/dev/null || env DDEV_NONINTERACTIVE=true "$@"; }
 fi
+WARM_HOME="$(getent passwd "$WARM_USER" | cut -d: -f6)"
+
+# The global config MUST omit the router before the first start: a router
+# would bind host ports 80/443, which belong to Caddy. The containerized app
+# writes the same config for its own user at boot (server/plugins/agent-tools.ts).
+runuser -u "$WARM_USER" -- mkdir -p "$WARM_HOME/.ddev" 2>/dev/null || mkdir -p "$WARM_HOME/.ddev"
+if ! grep -q ddev-router "$WARM_HOME/.ddev/global_config.yaml" 2>/dev/null; then
+  printf 'omit_containers: [ddev-router, ddev-ssh-agent]\nperformance_mode: none\ninstrumentation_opt_in: false\n' \
+    | runuser -u "$WARM_USER" -- tee -a "$WARM_HOME/.ddev/global_config.yaml" >/dev/null
+fi
+
+# ── 5. Warm-up ──────────────────────────────────────────────────────────────
+# One throwaway project start pulls the ddev web/db images (shared by every
+# run on this host) and initializes the ddev-global-cache volume (mkcert CA
+# etc.), whose first-time setup is NOT safe under parallel project starts.
+say "Warming the ddev image cache (throwaway project)"
+WARMUP="$(mktemp -d)"
+mkdir -p "$WARMUP/public"
+echo '<?php echo "quickddevpreviews-warmup";' > "$WARMUP/public/index.php"
+chown -R "$WARM_USER" "$WARMUP" 2>/dev/null || true
+(
+  cd "$WARMUP"
+  as_warm_user ddev config --project-type=php --docroot=public --project-name=quickddevpreviews-warmup
+  as_warm_user ddev start -y
+  as_warm_user ddev delete --omit-snapshot -y quickddevpreviews-warmup
+)
+rm -rf "$WARMUP"
 
 echo "✓ Host provisioned. Sanity check:"
 sudo docker info --format '  docker {{.ServerVersion}}'
-ddev --version | sed 's/^/  /'
+as_warm_user ddev --version | sed 's/^/  /'
