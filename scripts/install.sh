@@ -136,8 +136,14 @@ fi
 # ── 5. Pull + start ───────────────────────────────────────────────────────────
 say "Starting quickddevpreviews"
 cd "$INSTALL_DIR"
-docker compose pull -q
-docker compose up -d
+# Pull the published release image; if none is published yet (no release tag /
+# no CI pipeline), build from the local checkout instead.
+if ! docker compose pull -q; then
+  say "No published image found; building from source"
+  docker compose up -d --build
+else
+  docker compose up -d
+fi
 
 DOMAIN="$(grep '^QUICKDDEVPREVIEWS_BASE_DOMAIN=' "$INSTALL_DIR/.env" | cut -d= -f2)"
 IP="$(curl -fsS -4 --max-time 5 https://ifconfig.me 2>/dev/null || echo '<server-ip>')"
