@@ -16,6 +16,19 @@
 #   3. Provisions the host: Docker (any current version).
 #   4. Writes /opt/quickddevpreviews/.env (domain auto-derived via sslip.io).
 #   5. Pulls and starts the app + the caddy TLS entry point.
+# ── 0. Re-exec from a file ────────────────────────────────────────────────────
+# `curl | bash` streams this script to bash's stdin. bash reads it from that
+# pipe, and any child process that inherits stdin (git, its credential
+# prompts, ddev) can consume the bytes that were the REST of the script,
+# ending the install silently. Fix: on first run, slurp stdin into a temp
+# file and re-exec bash on it. From then on the script reads from a file, so
+# no child can ever touch it. QDP_SELF marks the re-exec'd copy.
+if [ "${QDP_SELF:-}" != "1" ]; then
+  TMP_SELF="$(mktemp)"
+  cat > "$TMP_SELF"
+  exec env QDP_SELF=1 bash "$TMP_SELF" "$@"
+fi
+
 set -euo pipefail
 
 INSTALL_DIR="/opt/quickddevpreviews"
