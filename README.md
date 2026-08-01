@@ -1,10 +1,10 @@
 # Quick DDEV previews
 
-A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS, register with email + password, connect a GitHub and launch live DDEV previews of any branch.
+A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS or a MacMini, connect GitHub repositories and launch quick DDEV previews of any branch, which can be shared secretly with testers, clients or coworkers.
 
 ## 🚧 (Experimental) fork of Knecht Cloud 🚧
 
-This project forked some techniques of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör.
+This project is a fork of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör. 
 
 
 > [!WARNING]
