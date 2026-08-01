@@ -1,10 +1,8 @@
 # quickddevpreviews
 
-A self-hosted service for generating DDEV preview environments. Install it on a
-cheap Hetzner Cloud VPS, register with email + password, connect a GitHub App,
-and launch live DDEV previews of any branch.
+A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS, register with email + password, connect a GitHub and launch live DDEV previews of any branch.
 
-## Fork of Knecht Cloud
+## (Experimental) fork of Knecht Cloud
 
 This project forked some techniques of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör.
 
@@ -94,9 +92,57 @@ App setup.
 
 ## Development
 
+quickddevpreviews needs a Linux host with Docker and the ddev CLI. For local
+development there is a Lima VM that provides exactly that.
+
+### On macOS via the Lima dev VM
+
+```bash
+# Install dependencies (on the Mac)
+npm install
+
+# Prepare the environment
+cp .env.example .env   # adjust the values (see the comments in the file)
+
+# Run database migrations
+npm run db:migrate
+```
+
+Then create and provision the Linux dev VM (the run substrate, same as a
+production VPS), once:
+
+```bash
+limactl create --name=quickddevpreviews-dev scripts/lima-vm.yaml
+limactl start quickddevpreviews-dev
+limactl shell quickddevpreviews-dev -- ./scripts/provision-host.sh
+```
+
+`provision-host.sh` installs Docker + the pinned ddev CLI, omits the
+ddev-router (it would collide with the preview proxy), and warms the shared
+image cache.
+
+Start the dev server inside the VM (edit on the Mac as usual; the repo is
+mounted into the VM at the identical path):
+
+```bash
+npm run dev:vm
+```
+
+Lima auto-forwards the dev server port to the Mac: the UI is at
+`http://localhost:3333` and previews at `http://<runId>.preview.lvh.me:3333`.
+
+> [!NOTE]
+> Running project environments requires a Linux host with Docker and ddev.
+> Details on host setup live in `.env.example` and the provisioning scripts
+> under `scripts/`.
+
+### On a plain Linux host
+
+If you already run Linux, skip Lima:
+
 ```bash
 npm install
-cp .env.example .env   # adjust the values (QUICKDDEVPREVIEWS_BASE_URL is required for the GitHub flow)
+cp .env.example .env
 npm run db:migrate
 npm run dev
 ```

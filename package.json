@@ -19,6 +19,7 @@
     "db:reset": "rm -f \"${QUICKDDEVPREVIEWS_DB_PATH:-.data/quickddevpreviews.db}\"* && drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "reset-password": "node scripts/reset-password.mjs",
+    "dev:vm": "limactl shell quickddevpreviews-dev -- bash scripts/vm-dev.sh",
     "preview:docker": "docker compose up -d --build"
   },
   "dependencies": {

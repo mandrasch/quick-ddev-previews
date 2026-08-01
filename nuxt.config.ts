@@ -33,13 +33,34 @@ export default defineNuxtConfig({
     },
   },
 
+  // Inside the dev VM the repo is a macOS virtiofs share whose inotify
+  // forwarding is unreliable: silently missed events leave the dev server on
+  // stale code. scripts/vm-dev.sh sets QUICKDDEVPREVIEWS_DEV_POLLING; then ALL
+  // watchers (Nuxt's chokidar, Vite's, and Nitro's) poll instead of trusting
+  // inotify.
+  watchers: {
+    chokidar: {
+      usePolling: !!process.env.QUICKDDEVPREVIEWS_DEV_POLLING,
+    },
+  },
+
   compatibilityDate: '2025-07-15',
+
+  nitro: {
+    watchOptions: {
+      usePolling: !!process.env.QUICKDDEVPREVIEWS_DEV_POLLING,
+    },
+  },
 
   vite: {
     server: {
       allowedHosts: process.env.QUICKDDEVPREVIEWS_BASE_DOMAIN
         ? [`.${process.env.QUICKDDEVPREVIEWS_BASE_DOMAIN}`]
         : undefined,
+      watch: {
+        usePolling: !!process.env.QUICKDDEVPREVIEWS_DEV_POLLING,
+        interval: 1000,
+      },
     },
   },
 

@@ -21,6 +21,7 @@ with GitHub Auth; we moved that to a second step after registration).
 ```bash
 npm install           # install deps + nuxt prepare
 npm run dev           # start dev server (port 3000)
+npm run dev:vm        # run the dev server inside the Linux dev VM (port 3333)
 npm run build         # production build
 npm run lint          # eslint
 npm run typecheck     # nuxt typecheck (run after `npm install`)
