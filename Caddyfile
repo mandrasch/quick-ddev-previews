@@ -1,0 +1,13 @@
+# quickddevpreviews TLS entry point (the `caddy` service in docker-compose.yml,
+# production only). Phase 1 serves a single dashboard domain with a normally
+# managed Let's Encrypt certificate.
+#
+# Phase 2 will add on-demand TLS for per-run preview subdomains, gated by the
+# /tls-ask endpoint (the on_demand_tls + https:// catch-all blocks from the
+# reference project's Caddyfile).
+#
+# Certificates and the ACME account persist in the caddy-data volume.
+
+{$QUICKDDEVPREVIEWS_BASE_DOMAIN} {
+	reverse_proxy quickddevpreviews:3000
+}

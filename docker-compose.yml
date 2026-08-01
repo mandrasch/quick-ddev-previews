@@ -1,0 +1,41 @@
+# quickddevpreviews: Phase 1 (auth + install).
+# Architecture: the app runs as a single Nitro container behind Caddy for TLS.
+# Phase 2 will add the host docker socket mount + the projects dir + ddev.
+
+services:
+  quickddevpreviews:
+    # Production pulls the CI-built release image, pinned via
+    # QUICKDDEVPREVIEWS_VERSION in .env. Local dev builds from source.
+    image: ghcr.io/quickddevpreviews/quickddevpreviews:${QUICKDDEVPREVIEWS_VERSION:-latest}
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      - NUXT_SESSION_COOKIE_DOMAIN=${QUICKDDEVPREVIEWS_BASE_DOMAIN:-}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # The app's own state (SQLite DB). Must point into the mounted volume or
+      # the DB dies with the container.
+      - ${QUICKDDEVPREVIEWS_DATA_DIR:-/data/quickddevpreviews/data}:${QUICKDDEVPREVIEWS_DATA_DIR:-/data/quickddevpreviews/data}
+    restart: unless-stopped
+
+  # TLS entry point (production only; the installer writes COMPOSE_PROFILES=prod
+  # into .env, dev compose runs never start this). Terminates HTTPS for the
+  # dashboard domain. Phase 2 will add on-demand TLS for preview subdomains.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["prod"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - QUICKDDEVPREVIEWS_BASE_DOMAIN=${QUICKDDEVPREVIEWS_BASE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
