@@ -10,6 +10,17 @@ This project is a fork of https://github.com/knecht-works/knecht-cloud, a projec
 > [!WARNING]
 > Experimental, use at your own risk. Under active development. No warranties given.
 
+## Screenshots
+
+Create preview from any branch:
+![Screenshot](screenshot_create_preview.jpg)
+Example of Craft CMS frontend:
+![Screenshot](screenshot_craft_frontend.jpg)
+Example of Craft CMS backend:
+![Screenshot](screenshot_craft_backend.jpg)
+Jump into the web or db container and run commands like `php craft up`: 
+![Screenshot](screenshot_terminal.jpg)
+
 ## Install
 
 On a fresh Ubuntu 24.04 server (as root):
