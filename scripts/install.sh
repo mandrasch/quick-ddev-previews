@@ -54,12 +54,17 @@ else
 fi
 
 # ── 2. The repo checkout ──────────────────────────────────────────────────────
+# git commands run with stdin from /dev/null: this script arrives via
+# `curl | bash`, so bash reads the script itself from stdin. git (and its
+# subprocesses, e.g. a credential prompt on a private URL) inherits that
+# pipe, and reading it would swallow the REST of the script, ending the
+# install silently right here.
 if [ -d "$INSTALL_DIR/.git" ]; then
   say "Updating existing checkout in $INSTALL_DIR"
-  git -C "$INSTALL_DIR" fetch --tags origin
+  git -C "$INSTALL_DIR" fetch --tags origin < /dev/null
 else
   say "Cloning $REPO_URL to $INSTALL_DIR"
-  git clone "$REPO_URL" "$INSTALL_DIR"
+  git clone "$REPO_URL" "$INSTALL_DIR" < /dev/null
 fi
 
 if [ -n "${QDP_REF:-}" ]; then
@@ -80,7 +85,7 @@ else
   fi
 fi
 say "Checking out $TAG"
-git -C "$INSTALL_DIR" checkout -qf "$TAG"
+git -C "$INSTALL_DIR" checkout -qf "$TAG" < /dev/null
 
 # ── 3. Provision the host ─────────────────────────────────────────────────────
 # Phase 1: Docker only. Phase 2 will add the ddev CLI + image warm-up.
