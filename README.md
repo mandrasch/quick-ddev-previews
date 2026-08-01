@@ -1,10 +1,14 @@
-# quickddevpreviews
+# Quick DDEV previews
 
 A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS, register with email + password, connect a GitHub and launch live DDEV previews of any branch.
 
-## (Experimental) fork of Knecht Cloud
+## 🚧 (Experimental) fork of Knecht Cloud 🚧
 
 This project forked some techniques of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör.
+
+
+> [!WARNING]
+> Experimental, use at your own risk. No warranties given.
 
 ## Install
 
@@ -38,11 +42,11 @@ checked-in template, then run the installer inside it:
 
 ```bash
 brew install lima
-limactl create --name=quickddevpreviews https://raw.githubusercontent.com/quickddevpreviews/quickddevpreviews/main/scripts/lima-server.yaml
+limactl create --name=quickddevpreviews https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/lima-server.yaml
 limactl start quickddevpreviews
 limactl shell quickddevpreviews
 # inside the VM:
-curl -fsSL https://raw.githubusercontent.com/quickddevpreviews/quickddevpreviews/main/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mandrasch/quickddevpreviews/quick-ddev-previews/main/scripts/install.sh | sudo bash
 ```
 
 The VM template exposes ports 80 and 443 on all interfaces of the Mac, so the
