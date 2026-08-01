@@ -33,11 +33,12 @@ export default defineEventHandler(async (event) => {
 
   // App names are globally unique on GitHub (and capped at 34 chars), so a
   // fixed name could only ever be claimed by a single instance worldwide.
-  // Derive it from this instance's host instead; the creator can still edit
-  // the pre-filled name on GitHub's confirmation page before the app is made.
-  const host = new URL(origin).hostname.replace(/[^a-z0-9-]+/gi, '-')
+  // A 5-char random suffix lets one operator run multiple servers without
+  // name collisions; the creator can still edit the pre-filled name on
+  // GitHub's confirmation page before the app is made.
+  const suffix = randomBytes(4).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 5)
   const manifest = {
-    name: `QDP ${host}`.slice(0, 34).replace(/[\s-]+$/, ''),
+    name: `Quick DDEV previews - ${suffix}`,
     url: origin,
     description: 'Boot DDEV preview environments from your repos.',
     redirect_url: `${origin}/setup/github/callback`,
