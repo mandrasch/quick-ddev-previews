@@ -4,7 +4,7 @@ import { db } from '../db'
 import { runs, type Project } from '../db/schema'
 import { writeDdevConfig, readDdevHosts, type EnvVar } from './ddev'
 import { prepareRunCheckout } from './git'
-import { execInSandbox, webContainerName, WEB_PROJECT_DIR } from './sandbox'
+import { execInSandbox, ensureIngressNetwork, webContainerName, WEB_PROJECT_DIR } from './sandbox'
 import { getInstallationToken } from '../utils/github-app'
 import { getMaxConcurrentRuns } from '../utils/settings'
 import { getProject } from '../utils/entities'
@@ -78,14 +78,24 @@ export async function startRun(runId: number, project: Project): Promise<void> {
     writeDdevConfig(checkoutDir, envVars, runId)
 
     // 3. Start ddev on the host daemon. This is where the containers boot.
+    //    The ingress network must exist first: the run's compose override
+    //    references it as external, and ddev fails the whole start if it's
+    //    missing.
     onLog('Starting ddev…\n')
-    await runWithLog(runId, ['ddev', 'start', '-y'], onLog, signal)
+    await ensureIngressNetwork()
+    const ddevExit = await runWithLog(runId, ['ddev', 'start', '-y'], onLog, signal)
+    if (ddevExit !== 0) {
+      throw new Error(`ddev start exited with code ${ddevExit}`)
+    }
 
     // 4. Run the custom start command in the web container, if set.
     const startCommand = await getRunStartCommand(runId)
     if (startCommand) {
       onLog(`Running start command: ${startCommand}\n`)
-      await runShellInSandbox(runId, startCommand, onLog, signal)
+      const startExit = await runShellInSandbox(runId, startCommand, onLog, signal)
+      if (startExit !== 0) {
+        throw new Error(`start command exited with code ${startExit}`)
+      }
     }
 
     // 5. Read the preview hosts (all ddev hostnames the project serves) and

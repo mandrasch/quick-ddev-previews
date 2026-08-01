@@ -184,7 +184,9 @@ async function wireNetworks(runId: number): Promise<void> {
 
 // Make sure the ingress network exists and, when the app itself runs as a
 // container, that it is attached, so the proxy can reach web container IPs.
-async function ensureIngressNetwork(): Promise<void> {
+// Must run before ANY `ddev start`: the run's compose override references the
+// network as external, so a missing network fails the whole start.
+export async function ensureIngressNetwork(): Promise<void> {
   try {
     await execa('docker', ['network', 'create', INGRESS_NETWORK])
   }
