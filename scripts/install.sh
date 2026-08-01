@@ -100,7 +100,20 @@ else
   fi
 fi
 say "Checking out $TAG"
-git -C "$INSTALL_DIR" checkout -qf "$TAG" < /dev/null
+# A version tag pins an immutable commit; a branch name (main, or a QDP_REF
+# branch) must resolve to the REMOTE ref, not a possibly-stale local branch:
+# a previous run that edited files in place (e.g. the old placeholder repo
+# URL) leaves local commits on main that `git fetch` won't overwrite, and
+# `checkout -qf main` would then run an OLD copy of this very script.
+case "$TAG" in
+  v*)
+    git -C "$INSTALL_DIR" checkout -qf "$TAG" < /dev/null
+    ;;
+  *)
+    git -C "$INSTALL_DIR" fetch origin "$TAG" < /dev/null
+    git -C "$INSTALL_DIR" reset --hard "origin/$TAG" < /dev/null
+    ;;
+esac
 
 # ── 3. Provision the host ─────────────────────────────────────────────────────
 # Phase 1: Docker only. Phase 2 will add the ddev CLI + image warm-up.
