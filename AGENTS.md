@@ -81,16 +81,35 @@ Caddy (TLS) --reverse_proxy--> quickddevpreviews:3000 (Nitro)
   - Callback `/setup/github/callback` exchanges code for credentials
   - No GitHub login (email/password stays the only login)
 
-## Phase 2 next steps (planned, not started)
+## Phase 3 (done): launch DDEV previews of GitHub projects
 
-- [ ] DDEV project selection + run environments
-  - Re-introduce `projects`, `runs`, `workflows`, `triggers` schema
-  - Docker socket mount + ddev CLI in the Dockerfile
-  - provision-host.sh adds ddev CLI + image warm-up
-- [ ] Preview environments with on-demand TLS
-  - Caddyfile gains on_demand_tls + https:// catch-all
-  - /tls-ask endpoint gates certificate issuance
-  - Wildcard sslip.io DNS for *.preview.<base> subdomains
+- [x] `projects` + `runs` schema (simplified, no workflow engine), migration `0002`
+- [x] Launcher UI at `/runs/new`: pick GitHub project (from App installations),
+  pick branch, customize start command, set .env values with "Copy .env.example",
+  db dump + uploaded-files placeholders (no function yet), "Launch preview" button
+- [x] `/api/runs/launch` queues a run (upserts the project row, dispatcher boots it)
+- [x] Runner: shallow clone (installation token as HTTP header) -> write ddev
+  overrides (unique name `quickddevpreviews-run-<id>`, env translated to preview
+  origins, mem/pids caps, low-mem db config) -> `ddev start` -> run the start
+  command in the web container -> mark previewReady + envState 'up'
+- [x] Dispatcher (concurrency-capped, poke + 10s safety interval) + runs-recover
+  plugin (running -> failed on restart)
+- [x] Preview pipeline: `shared/utils/preview-host.ts`, `server/middleware/
+  preview.ts`, `server/utils/preview-proxy.ts` (env mode), `server/routes/
+  tls-ask.get.ts`, Caddyfile on_demand_tls
+- [x] Infrastructure: Dockerfile (docker-ce-cli + ddev CLI), docker-compose.yml
+  (docker socket + projects dir + ~/.ddev + cookie domain), provision-host.sh
+  (ddev install + warm-up), agent-tools plugin (router/ssh-agent omitted)
+- [x] UI: `/runs` list, `/runs/[id]` detail (log + KPreviewBrowser), home -> /runs
+- [x] Delete run tears down containers + volumes
+
+## Phase 4 next steps (planned, not started)
+
+- [ ] Idle-stop / archive / restore lifecycle (reapIdleEnvs, retention ladder)
+- [ ] DB dump upload + import (`ddev import-db`), shared folders
+- [ ] Framework detection chips (typo3/craft/laravel) on the launcher
+- [ ] Retry / reboot / cancel buttons on the run page
+- [ ] Web terminal + SSH into the run
 
 ## Decisions
 

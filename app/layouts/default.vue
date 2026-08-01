@@ -5,6 +5,7 @@ const { user, clear } = useUserSession()
 const route = useRoute()
 
 const NAV = [
+  { label: 'Previews', icon: 'i-lucide-rocket', to: '/runs', match: ['/runs'] },
   { label: 'Settings', icon: 'i-lucide-settings-2', to: '/settings', match: ['/settings'] },
   { label: 'System', icon: 'i-lucide-server', to: '/system', match: ['/system'] },
 ]

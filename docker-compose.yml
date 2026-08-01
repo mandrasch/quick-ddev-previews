@@ -1,6 +1,6 @@
-# quickddevpreviews: Phase 1 (auth + install).
-# Architecture: the app runs as a single Nitro container behind Caddy for TLS.
-# Phase 2 will add the host docker socket mount + the projects dir + ddev.
+# quickddevpreviews: the control plane.
+# Architecture: the app drives the HOST docker daemon through the mounted
+# socket (one uniquely-named ddev project per run) and Caddy terminates TLS.
 
 services:
   quickddevpreviews:
@@ -12,18 +12,39 @@ services:
     env_file:
       - .env
     environment:
+      # The session cookie's Domain attribute must be set at RUNTIME: the value
+      # baked into the image at build is empty because CI builds without
+      # QUICKDDEVPREVIEWS_BASE_DOMAIN. Without it the cookie is host-only and
+      # the login-gated preview subdomains never receive the session.
       - NUXT_SESSION_COOKIE_DOMAIN=${QUICKDDEVPREVIEWS_BASE_DOMAIN:-}
+    # Grant the host docker socket's group to the (non-root) container process
+    # at RUNTIME. Find it with: stat -c '%g' /var/run/docker.sock
+    #   A Linux host's `docker` group is usually 999.
+    # Set DOCKER_GID in .env (local) or by the installer.
+    group_add:
+      - "${DOCKER_GID:-999}"
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
-      # The app's own state (SQLite DB). Must point into the mounted volume or
-      # the DB dies with the container.
+      # Drive the HOST daemon through its socket: that's how the per-run ddev
+      # projects are launched.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Fixed project path that MUST be byte-identical on both sides: the HOST
+      # daemon resolves the checkout bind mount when a run's stack is launched.
+      # A single variable is used on both sides so they can never drift.
+      - ${QUICKDDEVPREVIEWS_PROJECTS:-/data/quickddevpreviews/projects}:${QUICKDDEVPREVIEWS_PROJECTS:-/data/quickddevpreviews/projects}
+      # The app's own state (SQLite DB, dumps, archives).
       - ${QUICKDDEVPREVIEWS_DATA_DIR:-/data/quickddevpreviews/data}:${QUICKDDEVPREVIEWS_DATA_DIR:-/data/quickddevpreviews/data}
+      # ddev's per-user state (global config + the registry of per-run
+      # projects). Must survive recreates: name-based `ddev stop/delete` of
+      # older runs' envs resolve against this registry.
+      - ${QUICKDDEVPREVIEWS_DATA_DIR:-/data/quickddevpreviews/data}/.ddev:/home/node/.ddev
     restart: unless-stopped
 
   # TLS entry point (production only; the installer writes COMPOSE_PROFILES=prod
   # into .env, dev compose runs never start this). Terminates HTTPS for the
-  # dashboard domain. Phase 2 will add on-demand TLS for preview subdomains.
+  # dashboard domain and fetches per-hostname certificates on demand for the
+  # preview subdomains, gated by the /tls-ask endpoint (see Caddyfile).
   caddy:
     image: caddy:2-alpine
     profiles: ["prod"]

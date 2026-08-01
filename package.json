@@ -25,11 +25,14 @@
     "@nuxt/ui": "^4.8.2",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
+    "execa": "^9.6.1",
     "nuxt": "^4.4.8",
     "nuxt-auth-utils": "^0.5.29",
+    "octokit": "^5.0.5",
     "tailwindcss": "^4.3.1",
     "vue": "^3.5.35",
     "vue-router": "^5.1.0",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

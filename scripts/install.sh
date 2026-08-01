@@ -20,6 +20,7 @@ set -euo pipefail
 
 INSTALL_DIR="/opt/quickddevpreviews"
 DATA_DIR="/data/quickddevpreviews/data"
+PROJECTS_DIR="/data/quickddevpreviews/projects"
 REPO_URL="https://github.com/quickddevpreviews/quickddevpreviews"
 
 say() { echo "▶ $*"; }
@@ -88,6 +89,8 @@ bash "$INSTALL_DIR/scripts/provision-host.sh" < /dev/null
 say "Creating $DATA_DIR"
 mkdir -p "$DATA_DIR"
 chown -R 1000:1000 "$DATA_DIR"
+mkdir -p "$PROJECTS_DIR"
+chown -R 1000:1000 "$PROJECTS_DIR"
 
 # ── 4. .env ───────────────────────────────────────────────────────────────────
 if [ -f "$INSTALL_DIR/.env" ]; then
@@ -116,8 +119,10 @@ QUICKDDEVPREVIEWS_BASE_DOMAIN=$DOMAIN
 NUXT_SESSION_PASSWORD=$(openssl rand -base64 32)
 QUICKDDEVPREVIEWS_DATA_DIR=$DATA_DIR
 QUICKDDEVPREVIEWS_DB_PATH=$DATA_DIR/quickddevpreviews.db
+QUICKDDEVPREVIEWS_PROJECTS=$PROJECTS_DIR
 QUICKDDEVPREVIEWS_INSTALL_DIR=$INSTALL_DIR
 QUICKDDEVPREVIEWS_VERSION=$IMAGE_TAG
+DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
 COMPOSE_PROFILES=prod
 EOF
   chmod 600 "$INSTALL_DIR/.env"

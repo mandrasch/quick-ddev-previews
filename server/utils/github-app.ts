@@ -1,0 +1,111 @@
+import type { Octokit } from 'octokit'
+import { App } from 'octokit'
+import { githubAppCredentials } from './github-credentials'
+
+// GitHub App auth: the app's own identity replaces user OAuth tokens for all
+// repo access (clone, file reads, branch lists). The app authenticates with its
+// private key and mints short-lived (1h) installation tokens per repo, so no
+// user credential is ever stored.
+
+let cachedApp: App | null = null
+let cachedForAppId: string | null = null
+
+function getApp(): App {
+  const creds = githubAppCredentials()
+  if (!creds) {
+    throw new Error(
+      'GitHub App not configured. Open the dashboard and complete the GitHub App setup.',
+    )
+  }
+  if (cachedApp && cachedForAppId === creds.appId) return cachedApp
+  cachedApp = new App({ appId: creds.appId, privateKey: creds.privateKey })
+  cachedForAppId = creds.appId
+  return cachedApp
+}
+
+// owner/repo -> installation id. Installations change rarely (uninstall/reinstall).
+const installationIds = new Map<string, number>()
+
+async function getInstallationId(owner: string, repo: string): Promise<number> {
+  const key = `${owner}/${repo}`
+  const cached = installationIds.get(key)
+  if (cached) return cached
+  try {
+    const { data } = await getApp().octokit.rest.apps.getRepoInstallation({ owner, repo })
+    installationIds.set(key, data.id)
+    return data.id
+  }
+  catch (e) {
+    if ((e as { status?: number }).status === 404) {
+      throw new Error(`GitHub App is not installed on ${key}. Install it on the repo and try again.`, { cause: e })
+    }
+    throw e
+  }
+}
+
+// An Octokit authenticated as the repo's installation, for REST calls (file
+// reads, branch lists).
+export async function getInstallationClient(owner: string, repo: string): Promise<Octokit> {
+  return getApp().getInstallationOctokit(await getInstallationId(owner, repo))
+}
+
+// A raw installation token for git network operations (clone). 1h lifetime,
+// cached with a 10-min safety margin.
+const tokenCache = new Map<string, { token: string, expiresAt: number }>()
+
+export async function getInstallationToken(owner: string, repo: string): Promise<string> {
+  const key = `${owner}/${repo}`
+  const cached = tokenCache.get(key)
+  if (cached && cached.expiresAt - Date.now() > 10 * 60_000) return cached.token
+
+  const installationId = await getInstallationId(owner, repo)
+  const { data } = await getApp().octokit.rest.apps.createInstallationAccessToken({
+    installation_id: installationId,
+    repositories: [repo],
+  })
+  tokenCache.set(key, { token: data.token, expiresAt: new Date(data.expires_at).getTime() })
+  return data.token
+}
+
+// Every repo the app is installed on, across all installations: the source for
+// the "select a project" picker.
+export async function listAppRepositories() {
+  const repos = []
+  for await (const { repository } of getApp().eachRepository.iterator()) {
+    repos.push(repository)
+  }
+  return repos
+}
+
+// The repo's branch names, for the branch picker.
+export async function listRepoBranches(owner: string, repo: string): Promise<string[]> {
+  const octokit = await getInstallationClient(owner, repo)
+  const branches = await octokit.paginate(octokit.rest.repos.listBranches, {
+    owner,
+    repo,
+    per_page: 100,
+  })
+  return branches.map(b => b.name)
+}
+
+// Fetch a single file's contents at a ref, returns the decoded text or null
+// when not found. Used for the "Copy .env.example" button.
+export async function fetchFile(
+  owner: string,
+  repo: string,
+  path: string,
+  ref?: string,
+): Promise<string | null> {
+  const octokit = await getInstallationClient(owner, repo)
+  try {
+    const { data } = await octokit.rest.repos.getContent({ owner, repo, path, ...(ref ? { ref } : {}) })
+    if ('content' in data && data.encoding === 'base64') {
+      return Buffer.from(data.content, 'base64').toString('utf8')
+    }
+    return null
+  }
+  catch (e) {
+    if ((e as { status?: number }).status === 404) return null
+    throw e
+  }
+}

@@ -1,8 +1,8 @@
 # quickddevpreviews
 
 A self-hosted service for generating DDEV preview environments. Install it on a
-cheap Hetzner Cloud VPS, register with email + password, and (Phase 2) connect
-a GitHub App to boot DDEV projects and generate preview URLs.
+cheap Hetzner Cloud VPS, register with email + password, connect a GitHub App,
+and launch live DDEV previews of any branch.
 
 ## Fork of Knecht Cloud
 
@@ -41,14 +41,15 @@ npm run db:migrate
 npm run dev
 ```
 
-For Phase 3 (DDEV previews) set `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` in `.env`
-so the per-run preview subdomains (`<runId>.preview.lvh.me`) share the session
-cookie with the dashboard. Phase 1/Phase 2 do not need it.
+For DDEV previews set `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` in `.env` so the
+per-run preview subdomains (`<runId>.preview.lvh.me`) share the session cookie
+with the dashboard. Previews need a Linux host with Docker + the ddev CLI
+(`scripts/provision-host.sh` installs both; the app image ships ddev too).
 
 FritzBox users: if `lvh.me` does not resolve (some FritzBox firmware blocks
-DNS responses that return 127.0.0.1 as DNS rebinding protection), set the
-FritzBox upstream DNS to Google (8.8.8.8) or Cloudflare (1.1.1.1), or add an
-exception for `lvh.me` in the rebind protection settings.
+DNS responses that return 127.0.0.1 as DNS rebinding protection), set your
+laptops DNS to Google (8.8.8.8) or Cloudflare (1.1.1.1), or add an
+exception for `lvh.me` in the rebind protection settings in your FritzBox.
 
 ## Password reset
 

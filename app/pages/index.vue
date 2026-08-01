@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Home redirects to settings. Phase 2 will add /projects as the default.
-await navigateTo('/settings', { replace: true })
+// Home redirects to the previews list (the primary surface).
+await navigateTo('/runs', { replace: true })
 </script>
 
 <template>
