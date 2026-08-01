@@ -8,14 +8,14 @@ This project forked some techniques of https://github.com/knecht-works/knecht-cl
 
 
 > [!WARNING]
-> Experimental, use at your own risk. No warranties given.
+> Experimental, use at your own risk. Under active development. No warranties given.
 
 ## Install
 
 On a fresh Ubuntu 24.04 server (as root):
 
 ```bash
-curl -fsSL <repo-url>/scripts/install.sh | bash
+curl -fsSL https://github.com/mandrasch/quick-ddev-previews/scripts/install.sh | bash
 ```
 
 The installer auto-derives the domain from the server's public IP via
@@ -134,6 +134,11 @@ npm run dev:vm
 
 Lima auto-forwards the dev server port to the Mac: the UI is at
 `http://localhost:3333` and previews at `http://<runId>.preview.lvh.me:3333`.
+
+FritzBox users: if `lvh.me` does not resolve (some FritzBox firmware blocks
+DNS responses that return 127.0.0.1 as DNS rebinding protection), set your
+laptops DNS to Google (8.8.8.8) or Cloudflare (1.1.1.1), or add an
+exception for `lvh.me` in the rebind protection settings in your FritzBox.
 
 > [!NOTE]
 > Running project environments requires a Linux host with Docker and ddev.

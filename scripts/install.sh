@@ -21,7 +21,7 @@ set -euo pipefail
 INSTALL_DIR="/opt/quickddevpreviews"
 DATA_DIR="/data/quickddevpreviews/data"
 PROJECTS_DIR="/data/quickddevpreviews/projects"
-REPO_URL="https://github.com/quickddevpreviews/quickddevpreviews"
+REPO_URL="https://github.com/mandrasch/quick-ddev-previews"
 
 say() { echo "▶ $*"; }
 ok()  { echo "✓ $*"; }
