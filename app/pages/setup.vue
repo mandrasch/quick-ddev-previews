@@ -16,7 +16,7 @@ const isConfigured = computed(() => !!status.value?.configured)
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
-  password: z.string().min(12, 'Password must be at least 12 characters'),
+  password: z.string().min(5, 'Password must be at least 5 characters'),
   confirm: z.string(),
   name: z.string().optional(),
 }).refine(d => d.password === d.confirm, {
@@ -161,7 +161,7 @@ async function onSubmit() {
           <UInput
             v-model="state.password"
             type="password"
-            placeholder="At least 12 characters"
+            placeholder="At least 5 characters"
             size="lg"
             block
             autocomplete="new-password"

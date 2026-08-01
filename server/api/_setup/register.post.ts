@@ -1,14 +1,14 @@
 import { z } from 'zod'
 import { db } from '../../db'
 import { getUserByEmail, hasOwner, isInviteOpen, createUser, consumeInvite, getInviteByToken, toSessionUser } from '../../utils/users'
-import { hashPassword } from '../../utils/passwords'
+import { hashScrypt } from '../../utils/passwords'
 
 // POST /api/_setup/register: creates the first user (the owner) when no owner
 // exists, OR redeems an invite token to create a non-owner user. One endpoint,
 // two paths, decided by whether an `invite` token is in the body.
 const body = z.object({
   email: z.string().email(),
-  password: z.string().min(12, 'Password must be at least 12 characters'),
+  password: z.string().min(5, 'Password must be at least 5 characters'),
   name: z.string().optional(),
   invite: z.string().optional(),
 })
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
 
       const user = createUser({
         email,
-        passwordHash: hashPassword(password),
+        passwordHash: hashScrypt(password),
         name: name || null,
         invitedBy: invite.createdBy,
       })
@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
 
   const user = createUser({
     email,
-    passwordHash: hashPassword(password),
+    passwordHash: hashScrypt(password),
     name: name || null,
     isOwner: true,
   })

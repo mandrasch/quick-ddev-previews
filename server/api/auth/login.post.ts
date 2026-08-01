@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { verifyPassword } from '../../utils/passwords'
+import { verifyScrypt } from '../../utils/passwords'
 import { getUserByEmail, toSessionUser } from '../../utils/users'
 
 // POST /api/auth/login: email + password -> sealed session cookie.
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const { email, password } = parsed.data
   const user = getUserByEmail(email)
 
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  if (!user || !verifyScrypt(password, user.passwordHash)) {
     throw createError({ statusCode: 401, statusMessage: 'Invalid email or password' })
   }
 

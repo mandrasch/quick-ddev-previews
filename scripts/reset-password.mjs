@@ -27,7 +27,7 @@ if (!row) {
 }
 
 console.log(`Resetting password for ${row.email}`)
-console.log('Enter new password (min 12 chars):')
+console.log('Enter new password (min 5 chars):')
 
 const rl = createInterface({ input: process.stdin, output: null, terminal: true })
 let password = ''
@@ -38,8 +38,8 @@ for await (const chunk of process.stdin) {
 rl.close()
 password = password.trim()
 
-if (password.length < 12) {
-  console.error('Password must be at least 12 characters')
+if (password.length < 5) {
+  console.error('Password must be at least 5 characters')
   process.exit(1)
 }
 
