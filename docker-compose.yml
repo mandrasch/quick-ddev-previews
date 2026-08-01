@@ -6,7 +6,7 @@ services:
   quickddevpreviews:
     # Production pulls the CI-built release image, pinned via
     # QUICKDDEVPREVIEWS_VERSION in .env. Local dev builds from source.
-    image: ghcr.io/quickddevpreviews/quickddevpreviews:${QUICKDDEVPREVIEWS_VERSION:-latest}
+    image: ghcr.io/mandrasch/quick-ddev-previews:${QUICKDDEVPREVIEWS_VERSION:-latest}
     build:
       context: .
     env_file:

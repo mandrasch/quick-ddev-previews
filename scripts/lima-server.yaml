@@ -26,11 +26,17 @@ disk: "80GiB"
 # forwarding can reach them (Lima's default forwards bind to 127.0.0.1 only;
 # macOS allows unprivileged binds below 1024). TCP only: Lima does not forward
 # UDP, so HTTP/3 stays off and browsers fall back to HTTP/2.
+#
+# Guest port 3000 is the app itself (when running with COMPOSE_PROFILES
+# unset, i.e. no Caddy): forwarded to the Mac's localhost only, for local
+# access without opening the router.
 portForwards:
 - guestPort: 80
   hostIP: "0.0.0.0"
 - guestPort: 443
   hostIP: "0.0.0.0"
+- guestPort: 3000
+  hostIP: "127.0.0.1"
 
 minimumLimaVersion: 2.0.0
 

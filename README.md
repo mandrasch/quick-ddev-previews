@@ -67,6 +67,31 @@ inside come back up on their own. Updating and backups work exactly as below,
 with `/opt/quickddevpreviews` and `/data/quickddevpreviews` living inside the
 VM (`limactl shell quickddevpreviews`).
 
+### Accessing via localhost only (no ports opened)
+
+The VM template also forwards the app's port 3000 to the Mac's localhost, so
+you can use the dashboard without forwarding ports 80/443 on your router. To
+switch an installed instance to localhost mode:
+
+```bash
+limactl shell quickddevpreviews
+# inside the VM:
+cd /opt/quickddevpreviews
+sed -i '/^QUICKDDEVPREVIEWS_BASE_DOMAIN=/d' .env
+sed -i 's|^QUICKDDEVPREVIEWS_BASE_URL=.*|QUICKDDEVPREVIEWS_BASE_URL=http://localhost:3000|' .env
+sed -i 's/^COMPOSE_PROFILES=.*/COMPOSE_PROFILES=/' .env
+docker compose down && docker compose up -d
+exit
+```
+
+Then open `http://localhost:3000` in your browser. Caddy is not started in
+this mode. To go back to public access, restore `.env.sslipio.bak` (the
+installer keeps it) or re-run the installer.
+
+> [!NOTE]
+> The GitHub App manifest flow needs a publicly reachable callback URL, so
+> connecting GitHub won't work over localhost. Previews still work on the VM.
+
 ### Temporary Local Domain Setup on macOS
 
 To just try quickddevpreviews on a Mac, follow the macOS install above and use
