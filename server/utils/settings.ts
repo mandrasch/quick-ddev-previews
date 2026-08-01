@@ -11,6 +11,7 @@ const DEFAULTS: Omit<Settings, 'id'> = {
   idleStopMinutes: 1440,
   previewRetentionDays: 7,
   archiveRetentionDays: 30,
+  sshTarget: null,
 }
 
 function ensureRow(): Settings {
@@ -22,6 +23,13 @@ function ensureRow(): Settings {
 
 export function getSettings(): Settings {
   return ensureRow()
+}
+
+export function updateSettings(patch: Partial<Pick<Settings, 'sshTarget'>>): void {
+  db.update(settingsTable)
+    .set(patch)
+    .where(eq(settingsTable.id, 1))
+    .run()
 }
 
 export function getMaxConcurrentRuns(): number {

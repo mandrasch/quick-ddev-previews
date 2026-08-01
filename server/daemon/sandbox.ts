@@ -49,6 +49,23 @@ export async function listRunServices(runId: number): Promise<string[]> {
   }
 }
 
+// The identity project-facing execs run as inside the WEB container: this
+// process's uid, with HOME/USER resolved from the container's passwd (ddev
+// bakes a matching user into the web image). Same derivation as EXEC_WRAPPER,
+// but host-side, for the SSH command builder.
+export async function resolveContainerUser(runId: number): Promise<{ uid: number, gid: number, user: string, home: string }> {
+  const uid = process.getuid?.() ?? 1000
+  const gid = process.getgid?.() ?? 1000
+  try {
+    const { stdout } = await execa('docker', ['exec', webContainerName(runId), 'getent', 'passwd', String(uid)])
+    const fields = stdout.trim().split(':')
+    return { uid, gid, user: fields[0] || 'web', home: fields[5] || '/tmp' }
+  }
+  catch {
+    return { uid, gid, user: 'web', home: '/tmp' }
+  }
+}
+
 // Start (or resume) the run's ddev stack. `ddev start` is idempotent: a
 // stopped project (containers removed, volumes kept) comes back in seconds
 // with its DB intact; a running one is reconciled. The ingress network must

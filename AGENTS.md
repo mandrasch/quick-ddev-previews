@@ -108,6 +108,16 @@ Caddy (TLS) --reverse_proxy--> quickddevpreviews:3000 (Nitro)
   (ddev install + warm-up), agent-tools plugin (router/ssh-agent omitted)
 - [x] UI: `/runs` list, `/runs/[id]` detail (log + KPreviewBrowser), home -> /runs
 - [x] Delete run tears down containers + volumes
+- [x] Web terminal + SSH into the run
+  - In-app terminal (`KRunTerminal.vue` + WebSocket `/api/runs/:id/terminal`,
+    dockerode exec, no sshd)
+  - Copy-pasteable SSH command (`GET /api/runs/:id/ssh`, `server/utils/ssh.ts`):
+    `ssh -t <sshTarget> docker exec ...`. The `sshTarget` setting (owner,
+    Settings -> Remote access) is how the operator reaches the host; the
+    command runs `docker exec` on the host daemon.
+- [x] Launcher start command runs INSIDE the web container after `ddev start`
+  (which happens automatically host-side). Default `composer install`; use
+  plain container commands (`npm i`, `composer install`), NOT `ddev ...`.
 
 ## Phase 4 next steps (planned, not started)
 
@@ -115,7 +125,6 @@ Caddy (TLS) --reverse_proxy--> quickddevpreviews:3000 (Nitro)
 - [ ] DB dump upload + import (`ddev import-db`), shared folders
 - [ ] Framework detection chips (typo3/craft/laravel) on the launcher
 - [ ] Retry / reboot / cancel buttons on the run page
-- [ ] Web terminal + SSH into the run
 
 ## Phase 4 next: publish the Docker image via GitHub Actions (not started)
 

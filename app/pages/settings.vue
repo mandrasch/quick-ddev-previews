@@ -114,6 +114,39 @@ onMounted(async () => {
   // Auto-fetch the manifest + CSRF state so the connect button is ready.
   if (!ghInfo.value) await startGhConnect()
 })
+
+// ── Remote access (SSH target) ───────────────────────────────────────────────
+const { data: settingsData } = await useFetch<{ sshTarget: string | null, sshTargetDefault: string | null }>('/api/settings')
+const sshTarget = ref('')
+const sshTargetSaved = ref('')
+
+watch(settingsData, (s) => {
+  if (!s) return
+  if (sshTarget.value === sshTargetSaved.value) {
+    sshTarget.value = s.sshTarget ?? ''
+    sshTargetSaved.value = s.sshTarget ?? ''
+  }
+}, { immediate: true })
+
+// Debounced save: keep the field editable while typing, persist ~800ms after
+// the last keystroke.
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+watch(sshTarget, (val) => {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    if (val === sshTargetSaved.value) return
+    try {
+      await $fetch('/api/settings', {
+        method: 'PATCH',
+        body: { sshTarget: val || null },
+      })
+      sshTargetSaved.value = val
+    }
+    catch {
+      // Keep the field as typed; the next keystroke retries.
+    }
+  }, 800)
+})
 </script>
 
 <template>
@@ -207,6 +240,31 @@ onMounted(async () => {
             </UButton>
           </form>
         </template>
+      </section>
+
+      <!-- ── Remote access (SSH target, owner only) ────────────────────────── -->
+      <section
+        v-if="isOwner"
+        class="k-card p-6"
+      >
+        <h2 class="text-lg font-semibold">
+          Remote access
+        </h2>
+        <p class="mt-2 text-sm text-muted">
+          How do you reach this server over SSH? The run page's terminal modal
+          uses this address to build the copy-pasteable SSH command. The web
+          terminal works without it.
+        </p>
+        <UInput
+          v-model="sshTarget"
+          type="text"
+          placeholder="knecht@my-server.com"
+          class="mt-4 max-w-md"
+          block
+        />
+        <p class="mt-2 text-2xs text-dimmed">
+          Default: {{ settingsData?.sshTargetDefault ?? 'not set' }}
+        </p>
       </section>
 
       <!-- ── User management (owner only) ──────────────────────────────────── -->

@@ -82,18 +82,10 @@ function reload() {
 const address = ref(displayUrl(homeUrl))
 const editing = ref(false)
 
+// Show the REAL preview origin in the bar (not the project's own ddev
+// hostname): what the browser actually loaded. The original project host is
+// shown alongside as a muted suffix (props.hosts[0]).
 function displayUrl(url: string): string {
-  try {
-    const u = new URL(url)
-    const target = parsePreviewHost(u.host)
-    if (target?.runId === props.runId && props.hosts.length) {
-      const host = target.label
-        ? props.hosts.find(h => previewLabel(h) === target.label)
-        : primaryHost.value
-      if (host) return host + u.pathname + u.search + u.hash
-    }
-  }
-  catch { /* not a URL, show as-is */ }
   return url.replace(/^https?:\/\//, '')
 }
 
@@ -194,6 +186,13 @@ function resetAddress() {
             v-else
             class="k-mono flex-1 truncate text-xs text-dimmed"
           >{{ booting ? 'Preparing the preview…' : 'no live preview' }}</span>
+          <span
+            v-if="live && primaryHost"
+            class="k-mono flex-none truncate text-2xs text-dimmed/70"
+            :title="primaryHost"
+          >
+            {{ primaryHost }}
+          </span>
         </div>
       </div>
 

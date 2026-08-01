@@ -50,6 +50,9 @@ export default defineNuxtConfig({
     watchOptions: {
       usePolling: !!process.env.QUICKDDEVPREVIEWS_DEV_POLLING,
     },
+    experimental: {
+      websocket: true,
+    },
   },
 
   vite: {

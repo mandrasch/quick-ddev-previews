@@ -183,6 +183,11 @@ export const settings = sqliteTable('settings', {
   idleStopMinutes: integer('idle_stop_minutes').notNull().default(1440),
   previewRetentionDays: integer('preview_retention_days').notNull().default(7),
   archiveRetentionDays: integer('archive_retention_days').notNull().default(30),
+  // How the operator reaches this server over SSH (`user@host`). Only used to
+  // BUILD the run page's copy-pasteable SSH command (ssh -t <target> docker
+  // exec ...); quickddevpreviews itself never connects anywhere with it and
+  // manages no keys.
+  sshTarget: text('ssh_target'),
 })
 
 export type Settings = typeof settings.$inferSelect

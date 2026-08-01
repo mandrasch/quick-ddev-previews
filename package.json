@@ -24,7 +24,10 @@
   },
   "dependencies": {
     "@nuxt/ui": "^4.8.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "better-sqlite3": "^12.10.0",
+    "dockerode": "^5.0.1",
     "drizzle-orm": "^0.45.2",
     "execa": "^9.6.1",
     "nuxt": "^4.4.8",
@@ -40,6 +43,7 @@
     "@iconify-json/lucide": "^1.2.116",
     "@nuxt/eslint": "^1.16.0",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/dockerode": "^4.0.1",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.5.0",
     "typescript": "^6.0.3",

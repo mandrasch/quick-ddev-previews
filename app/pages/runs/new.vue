@@ -24,7 +24,7 @@ const ghNotConfigured = computed(() => reposData.value ? !reposData.value.config
 const repo = ref<RepoOption | undefined>(undefined)
 const branches = ref<string[]>([])
 const branch = ref<string>('')
-const startCommand = ref('ddev start && ddev composer install')
+const startCommand = ref('composer install')
 const envText = ref('')
 const launching = ref(false)
 const launchError = ref<string | null>(null)
@@ -158,11 +158,11 @@ async function launch() {
         <!-- 3. Custom start command -->
         <UFormField
           label="Start command"
-          hint="Runs inside the web container after ddev start."
+          hint="Runs inside the web container after ddev start (which happens automatically). Use plain container commands, not ddev: e.g. 'composer install' or 'npm i'."
         >
           <UInput
             v-model="startCommand"
-            placeholder="ddev start && ddev composer install"
+            placeholder="composer install"
             size="lg"
             block
           />
