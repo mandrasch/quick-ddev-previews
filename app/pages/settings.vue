@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 const { user } = useUserSession()
 const isOwner = computed(() => user.value?.isOwner)
+const route = useRoute()
 
 // ── Users + invites ──────────────────────────────────────────────────────────
 const { data, refresh } = await useFetch('/api/users')
@@ -59,6 +60,60 @@ function closeInviteModal() {
   inviteUrl.value = null
   inviteError.value = null
 }
+
+// ── GitHub integration ───────────────────────────────────────────────────────
+// Client-only: the manifest endpoint sets an httpOnly CSRF-state cookie which
+// only reaches the browser on a real HTTP response.
+const ghInfo = ref<{ appId: string, slug: string | null, htmlUrl: string | null, clientId: string } | null>(null)
+const ghManifest = ref<{ state: string, manifest: Record<string, unknown> } | null>(null)
+const ghConnecting = ref(false)
+const ghError = ref<string | null>(null)
+
+async function loadGhInfo() {
+  if (!isOwner.value) return
+  ghInfo.value = await $fetch('/api/setup/github/info')
+}
+
+async function startGhConnect() {
+  ghError.value = null
+  ghConnecting.value = true
+  try {
+    const res = await $fetch<{ configured: boolean, state?: string, manifest?: Record<string, unknown> }>(
+      '/api/setup/github/manifest',
+    )
+    if (res.configured) {
+      await loadGhInfo()
+      return
+    }
+    ghManifest.value = { state: res.state!, manifest: res.manifest! }
+  }
+  catch (err: unknown) {
+    const e = err as { data?: { statusMessage?: string } }
+    ghError.value = e?.data?.statusMessage || 'Failed to start GitHub App setup'
+  }
+  finally {
+    ghConnecting.value = false
+  }
+}
+
+const ghActionUrl = computed(() =>
+  ghManifest.value ? `https://github.com/settings/apps/new?state=${ghManifest.value.state}` : '',
+)
+
+async function disconnectGh() {
+  if (!confirm('Disconnect GitHub App? Repo access will stop immediately.')) return
+  await $fetch('/api/setup/github', { method: 'DELETE' })
+  ghInfo.value = null
+  ghManifest.value = null
+}
+
+onMounted(async () => {
+  await loadGhInfo()
+  if (route.query.error === 'state') ghError.value = 'Setup session expired, please try again.'
+  else if (route.query.error === 'conversion') ghError.value = 'GitHub could not create the app. Please try again.'
+  // Auto-fetch the manifest + CSRF state so the connect button is ready.
+  if (!ghInfo.value) await startGhConnect()
+})
 </script>
 
 <template>
@@ -73,8 +128,11 @@ function closeInviteModal() {
         </p>
       </div>
 
-      <!-- ── GitHub integration stub ───────────────────────────────────────── -->
-      <section class="k-card p-6">
+      <!-- ── GitHub integration ───────────────────────────────────────────── -->
+      <section
+        v-if="isOwner"
+        class="k-card p-6"
+      >
         <div class="flex items-center gap-3">
           <UIcon
             name="i-simple-icons-github"
@@ -84,19 +142,71 @@ function closeInviteModal() {
             GitHub Integration
           </h2>
         </div>
-        <p class="mt-2 text-sm text-muted">
-          Connect a GitHub App for repo access (cloning, pull requests, triggers).
-          Available in Phase 2.
-        </p>
-        <UButton
-          disabled
-          color="neutral"
-          variant="outline"
+
+        <UAlert
+          v-if="ghError"
+          color="error"
+          variant="subtle"
           class="mt-4"
-          icon="i-simple-icons-github"
-        >
-          Connect GitHub (coming soon)
-        </UButton>
+          title="GitHub setup failed"
+          :description="ghError"
+        />
+
+        <template v-if="ghInfo">
+          <p class="mt-2 text-sm text-muted">
+            Connected as <span class="text-toned font-medium">{{ ghInfo.slug || ghInfo.appId }}</span>.
+            Repo access is active for selected repositories.
+          </p>
+          <div class="mt-4 flex gap-2">
+            <UButton
+              :to="ghInfo.htmlUrl ? `${ghInfo.htmlUrl}/installations` : undefined"
+              external
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-external-link"
+            >
+              Manage on GitHub
+            </UButton>
+            <UButton
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="disconnectGh"
+            >
+              Disconnect
+            </UButton>
+          </div>
+        </template>
+
+        <template v-else>
+          <p class="mt-2 text-sm text-muted">
+            Connect a GitHub App for repo access (cloning, pull requests, triggers).
+            Created under your personal account, then install it on the repos to manage.
+          </p>
+
+          <!-- Rendered from first paint so the button never pops in: it sits
+               in a loading state until the manifest + CSRF state load, then enables. -->
+          <form
+            :action="ghActionUrl"
+            method="post"
+            class="mt-4"
+          >
+            <input
+              type="hidden"
+              name="manifest"
+              :value="ghManifest ? JSON.stringify(ghManifest.manifest) : ''"
+            >
+            <UButton
+              type="submit"
+              icon="i-simple-icons-github"
+              color="neutral"
+              :loading="ghConnecting"
+              :disabled="!ghManifest"
+            >
+              Create GitHub App
+            </UButton>
+          </form>
+        </template>
       </section>
 
       <!-- ── User management (owner only) ──────────────────────────────────── -->

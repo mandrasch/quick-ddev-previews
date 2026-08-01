@@ -48,3 +48,31 @@ export const invites = sqliteTable('invites', {
 
 export type Invite = typeof invites.$inferSelect
 export type NewInvite = typeof invites.$inferInsert
+
+// The GitHub App that powers repo access (clone, PRs, triggers). A single row
+// (id = 1). Created from the UI via the GitHub App manifest flow after the
+// owner logged in, so a fresh instance needs no GitHub env vars: GitHub mints
+// the app and returns all its credentials at once. Secrets are encrypted at
+// rest (server/utils/crypto.ts). Phase 2 scope: repo access only; email/password
+// stays the only login.
+export const githubApp = sqliteTable('github_app', {
+  id: integer('id').primaryKey(), // singleton, always 1
+
+  appId: text('app_id').notNull(),
+  slug: text('slug'),
+  htmlUrl: text('html_url'),
+  clientId: text('client_id').notNull(),
+
+  // Encrypted (AES-256-GCM). Never read these directly: go through
+  // server/utils/github-credentials.ts, which decrypts.
+  clientSecretEnc: text('client_secret_enc').notNull(),
+  privateKeyEnc: text('private_key_enc').notNull(),
+  webhookSecretEnc: text('webhook_secret_enc'),
+
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`),
+})
+
+export type GithubAppRow = typeof githubApp.$inferSelect
+export type NewGithubAppRow = typeof githubApp.$inferInsert

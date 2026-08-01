@@ -64,15 +64,17 @@ Caddy (TLS) --reverse_proxy--> quickddevpreviews:3000 (Nitro)
 - [x] Login / logout (sealed session cookie via nuxt-auth-utils)
 - [x] Multi-user invites (owner creates one-time invite URLs, no SMTP)
 - [x] Password reset CLI (`scripts/reset-password.mjs`, run inside container)
-- [x] Settings page (users list, invite management, GitHub stub)
+- [x] Settings page (users list, invite management, GitHub integration)
 - [x] System page (version, host, password-reset instructions)
-
-## Phase 2 (planned, not started)
-
-- [ ] GitHub App integration (repo access: clone, PRs, triggers)
-  - Re-introduce `githubApp` schema table (from reference)
-  - Settings page "Connect GitHub" button replaces the stub
+- [x] GitHub App integration (repo access: clone, PRs, triggers)
+  - `githubApp` schema table (from reference), AES-256-GCM encrypted at rest
+  - Settings page "Create GitHub App" button + GitHub manifest flow
+  - Owner-only APIs: manifest, info, disconnect
+  - Callback `/setup/github/callback` exchanges code for credentials
   - No GitHub login (email/password stays the only login)
+
+## Phase 2 next steps (planned, not started)
+
 - [ ] DDEV project selection + run environments
   - Re-introduce `projects`, `runs`, `workflows`, `triggers` schema
   - Docker socket mount + ddev CLI in the Dockerfile
