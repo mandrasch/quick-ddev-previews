@@ -4,6 +4,10 @@ A self-hosted service for generating DDEV preview environments. Install it on a
 cheap Hetzner Cloud VPS, register with email + password, and (Phase 2) connect
 a GitHub App to boot DDEV projects and generate preview URLs.
 
+## Fork of Knecht Cloud
+
+This project was heavily inspired by https://github.com/knecht-works/knecht-cloud by the amazingly talented Samuel Reichör.
+
 ## Install
 
 On a fresh Ubuntu 24.04 server (as root):
@@ -32,10 +36,19 @@ QDP_DOMAIN=previews.example.com bash <(curl -fsSL <repo-url>/scripts/install.sh)
 
 ```bash
 npm install
-cp .env.example .env   # adjust the values
+cp .env.example .env   # adjust the values (QUICKDDEVPREVIEWS_BASE_URL is required for the GitHub flow)
 npm run db:migrate
 npm run dev
 ```
+
+For Phase 3 (DDEV previews) set `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` in `.env`
+so the per-run preview subdomains (`<runId>.preview.lvh.me`) share the session
+cookie with the dashboard. Phase 1/Phase 2 do not need it.
+
+FritzBox users: if `lvh.me` does not resolve (some FritzBox firmware blocks
+DNS responses that return 127.0.0.1 as DNS rebinding protection), set the
+FritzBox upstream DNS to Google (8.8.8.8) or Cloudflare (1.1.1.1), or add an
+exception for `lvh.me` in the rebind protection settings.
 
 ## Password reset
 
