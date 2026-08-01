@@ -24,6 +24,12 @@ const LOG_CAP = 128 * 1024
 // In-flight runs: abort controllers keyed by runId, used by cancelRun.
 const controllers = new Map<number, AbortController>()
 
+// Runs the CURRENT process is actually executing (controllers.keys()). The
+// dispatcher counts these, not every DB row with status 'running': a row left
+// 'running' by a killed process (e.g. a container recreate mid-run) must not
+// block the queue forever.
+const runningRuns = new Set<number>()
+
 function appendLog(runId: number, chunk: string): void {
   if (!chunk) return
   const row = db.select().from(runs).where(eq(runs.id, runId)).get()
@@ -36,6 +42,7 @@ function appendLog(runId: number, chunk: string): void {
 export async function startRun(runId: number, project: Project): Promise<void> {
   const controller = new AbortController()
   controllers.set(runId, controller)
+  runningRuns.add(runId)
   const signal = controller.signal
 
   let log = ''
@@ -123,6 +130,7 @@ export async function startRun(runId: number, project: Project): Promise<void> {
   }
   finally {
     controllers.delete(runId)
+    runningRuns.delete(runId)
   }
 }
 
@@ -194,9 +202,22 @@ async function getRunStartCommand(runId: number): Promise<string | null> {
 
 export async function dispatchRuns(): Promise<void> {
   const max = getMaxConcurrentRuns()
-  const active = db.select().from(runs)
+
+  // Reclaim rows the current process isn't executing: a 'running' row whose
+  // run died with its process (e.g. a container recreate mid-run) must be
+  // marked failed, or it counts as active forever and blocks the queue.
+  const stale = db.select().from(runs)
     .where(eq(runs.status, 'running'))
-    .all().length
+    .all()
+    .filter(r => !runningRuns.has(r.id))
+  for (const row of stale) {
+    db.update(runs)
+      .set({ status: 'failed', finishedAt: new Date() })
+      .where(eq(runs.id, row.id))
+      .run()
+  }
+
+  const active = runningRuns.size
   const slots = max - active
   if (slots <= 0) return
 
