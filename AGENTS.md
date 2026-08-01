@@ -35,14 +35,19 @@ npm run reset-password # password reset CLI (run inside container)
 
 Go to http://localhost:3000. First visit shows the setup page.
 
-For Phase 3 (DDEV previews): set QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me in .env
-so the per-run preview subdomains (<runId>.preview.lvh.me) share the session
-cookie with the dashboard. Phase 1/Phase 2 do not need it.
+The installer (`scripts/install.sh`) asks how the instance is reached:
+  1) sslip.io auto-domain (zero DNS, VPS)   [default]
+  2) a real domain (user DNS records)
+  3) lvh.me (local previews on a Mac/Lima VM; swaps in Caddyfile.lvhme with
+     Caddy's internal CA, since Let's Encrypt can't issue for 127.0.0.1)
+Non-interactive: `QDP_DOMAIN=<domain>` forces mode 2; `QDP_MODE=sslip|domain|
+lvhme` forces any; no TTY (CI) defaults to sslip. The session cookie must be
+scoped to the base domain (`NUXT_SESSION_COOKIE_DOMAIN`) so the per-run
+preview subdomains (`<runId>.preview.<base>`) share it with the dashboard.
 
-FritzBox users: if lvh.me does not resolve (some FritzBox firmware blocks
-DNS responses that return 127.0.0.1 as DNS rebinding protection), set the
-FritzBox upstream DNS to Google (8.8.8.8) or Cloudflare (1.1.1.1), or add an
-exception for lvh.me in the rebind protection settings.
+DNS note: if a 127.0.0.1-resolving domain like lvh.me doesn't resolve (e.g.
+some FritzBox routers block rebinding answers), set the Mac's upstream DNS to
+Google (8.8.8.8) or Cloudflare (1.1.1.1), or add a rebind exception.
 
 ## Architecture (Phase 1)
 

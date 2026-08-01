@@ -4,17 +4,18 @@
 #
 #   curl -fsSL <repo-url>/scripts/install.sh | bash
 #
-# Non-interactive: QDP_DOMAIN=<domain> bash install.sh
-#   The installer auto-derives the domain from the server's public IP via
-#   sslip.io (e.g. 1-2-3-4.sslip.io). Override with QDP_DOMAIN for a real
-#   domain. Testing: QDP_REF=<branch/tag> checks out that ref.
+# Interactive: asks how the instance should be reached (sslip.io auto-domain /
+# real domain / lvh.me local previews). Non-interactive overrides:
+#   QDP_DOMAIN=<domain>   use a real domain (skips the menu)
+#   QDP_MODE=sslip|domain|lvhme   force a mode (no TTY: defaults to sslip)
+#   QDP_REF=<branch/tag>  testing: checks out that ref
 #
 # What it does:
 #   1. Reserves uid 1000 (the `quickddevpreviews` user): the container runs
 #      as uid 1000 and owns the shared state dirs.
 #   2. Clones the repo to /opt/quickddevpreviews at the newest release tag.
 #   3. Provisions the host: Docker (any current version).
-#   4. Writes /opt/quickddevpreviews/.env (domain auto-derived via sslip.io).
+#   4. Writes /opt/quickddevpreviews/.env for the chosen mode.
 #   5. Pulls and starts the app + the caddy TLS entry point.
 # ── 0. Re-exec from a file ────────────────────────────────────────────────────
 # `curl | bash` streams this script to bash's stdin. bash reads it from that
@@ -126,23 +127,67 @@ mkdir -p "$PROJECTS_DIR"
 chown -R 1000:1000 "$PROJECTS_DIR"
 
 # ── 4. .env ───────────────────────────────────────────────────────────────────
+# Three deployment modes, chosen interactively (or via QDP_DOMAIN / QDP_MODE):
+#   1) sslip.io auto-domain   zero DNS, for a VPS with a public IP   (default)
+#   2) a real domain          the user points DNS records at the box
+#   3) lvh.me                 local previews on a Mac/Lima VM (internal TLS)
 if [ -f "$INSTALL_DIR/.env" ]; then
   ok ".env exists, keeping it"
 else
-  # Auto-derive domain from public IP via sslip.io.
-  # 1.2.3.4 -> 1-2-3-4.sslip.io
+  # A real domain given via env skips the menu (non-interactive installs).
   DOMAIN="${QDP_DOMAIN:-}"
-  if [ -z "$DOMAIN" ]; then
-    say "Auto-deriving domain from public IP"
-    IP="$(curl -fsS -4 --max-time 5 https://ifconfig.me 2>/dev/null || true)"
-    if [ -n "$IP" ]; then
-      DASHED_IP="$(echo "$IP" | tr . -)"
-      DOMAIN="${DASHED_IP}.sslip.io"
-      ok "Derived domain: $DOMAIN"
-    else
-      die "Could not determine public IP. Set QDP_DOMAIN=<your-domain> and re-run."
-    fi
+  if [ -n "$DOMAIN" ]; then
+    MODE="domain"
+  elif [ -n "${QDP_MODE:-}" ]; then
+    MODE="$QDP_MODE"
+  elif [ -e /dev/tty ]; then
+    echo
+    echo "How do you want to reach this instance?"
+    echo "  1) sslip.io auto-domain (zero DNS; recommended for a VPS) [default]"
+    echo "  2) A real domain you own (e.g. previews.example.com)"
+    echo "  3) lvh.me (local previews on a Mac/Lima VM; internal TLS)"
+    printf "Choose [1/2/3], Enter for default: "
+    read -r CHOICE < /dev/tty
+    case "${CHOICE:-1}" in
+      2) MODE="domain" ;;
+      3) MODE="lvhme" ;;
+      *) MODE="sslip" ;;
+    esac
+  else
+    # No TTY (e.g. CI): fall back to the zero-DNS default.
+    MODE="sslip"
   fi
+
+  case "$MODE" in
+    domain)
+      [ -n "$DOMAIN" ] || {
+        printf "Domain for this instance (e.g. previews.example.com): "
+        read -r DOMAIN < /dev/tty
+      }
+      [ -n "$DOMAIN" ] || die "A domain is required"
+      ;;
+    lvhme)
+      DOMAIN="lvh.me"
+      # Let's Encrypt cannot issue for a local domain; use Caddy's internal CA.
+      # The stock Caddyfile (Let's Encrypt) is restored by a fresh install in
+      # another mode.
+      cp "$INSTALL_DIR/Caddyfile.lvhme" "$INSTALL_DIR/Caddyfile"
+      say "Using Caddy internal TLS for $DOMAIN (browser shows a certificate warning)"
+      ;;
+    *)
+      # Auto-derive the domain from the public IP via sslip.io (1.2.3.4 ->
+      # 1-2-3-4.sslip.io).
+      say "Auto-deriving domain from public IP"
+      IP="$(curl -fsS -4 --max-time 5 https://ifconfig.me 2>/dev/null || true)"
+      if [ -n "$IP" ]; then
+        DASHED_IP="$(echo "$IP" | tr . -)"
+        DOMAIN="${DASHED_IP}.sslip.io"
+        ok "Derived domain: $DOMAIN"
+      else
+        die "Could not determine public IP. Set QDP_DOMAIN=<your-domain> and re-run."
+      fi
+      ;;
+  esac
   [ -n "$DOMAIN" ] || die "A domain is required"
 
   say "Writing $INSTALL_DIR/.env"
@@ -179,7 +224,18 @@ echo
 ok "quickddevpreviews is running."
 echo
 echo "Next steps:"
-echo "  1. Ports 80 and 443 must be reachable (check your cloud firewall)."
-echo "  2. Open https://$DOMAIN and create your admin account."
+if [ "$DOMAIN" = "lvh.me" ]; then
+  echo "  1. Open https://lvh.me in your browser and create your admin account."
+  echo "  2. Accept the certificate warning once (Caddy's internal CA)."
+  echo "  3. Previews are at https://<runId>.preview.lvh.me (also reachable only"
+  echo "     from this machine; no ports are opened)."
+  echo
+  echo "   (The Mac must resolve lvh.me to 127.0.0.1: use Cloudflare/Google"
+  echo "    upstream DNS, or a rebind exception for lvh.me.)"
+else
+  echo "  1. Ports 80 and 443 must be reachable (check your cloud firewall)."
+  echo "  2. Open https://$DOMAIN and create your admin account."
+  echo "     (DNS: A $DOMAIN -> $IP)"
+fi
 echo
 echo "Useful: docker compose -f $INSTALL_DIR/docker-compose.yml logs -f quickddevpreviews"
