@@ -14,6 +14,9 @@ Significant changes made:
 > [!WARNING]
 > Experimental, use at your own risk. This project is an early preview and proof of concept - no warranties given.
 
+## Demo video
+
+- **[PoC: Quick (selfhosted) DDEV previews for PHP projects - Craft CMS example](https://www.youtube.com/watch?v=sS0WUtyXYm4&feature=youtu.be)** - youtube.com
 
 ## Screenshots
 
