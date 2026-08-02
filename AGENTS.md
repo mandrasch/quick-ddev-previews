@@ -149,6 +149,12 @@ project uses (see `_reference-project/knecht-cloud/.github/workflows/release.yml
 - [ ] Update `docker-compose.yml` image name from the placeholder to
   `ghcr.io/<owner>/quick-ddev-previews:${QUICKDDEVPREVIEWS_VERSION:-latest}`
 
+## Phase 5: Access for testers (UX research needed)
+
+There is research needed to let external testers access projects: Invite them via email? Share a secure link?
+
+Another discussion for this is: Should the runs/previews be numbered like 1.lvh.me, 2.lvh.me - or would a random word string (or user given string) be better for user experience. We need to check solutions like GitHub Codespaces.
+
 ## Decisions
 
 - Service name: `quickddevpreviews` (Linux user, container, install dir)

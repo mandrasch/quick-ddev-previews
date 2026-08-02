@@ -16,6 +16,6 @@
         opacity="0.5"
       />
     </svg>
-    quickddevpreviews
+    Quick DDEV previews
   </span>
 </template>

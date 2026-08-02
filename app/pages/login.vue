@@ -78,12 +78,14 @@ async function onSubmit() {
       <UFormField
         label="Email"
         name="email"
+        class="max-w-md"
       >
         <UInput
           v-model="state.email"
           type="email"
           placeholder="you@example.com"
           size="lg"
+          class="w-full"
           block
           autocomplete="email"
         />
@@ -92,12 +94,14 @@ async function onSubmit() {
       <UFormField
         label="Password"
         name="password"
+        class="max-w-md"
       >
         <UInput
           v-model="state.password"
           type="password"
           placeholder="********"
           size="lg"
+          class="w-full"
           block
           autocomplete="current-password"
         />

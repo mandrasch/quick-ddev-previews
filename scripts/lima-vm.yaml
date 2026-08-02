@@ -8,7 +8,9 @@
 #   npm run dev:vm
 #
 # Lima auto-forwards the dev server port to the Mac, so the UI is at
-# http://localhost:3333 and previews at http://<runId>.preview.lvh.me:3333.
+# http://lvh.me:3333 (the session cookie is scoped to the base domain, so the
+# dashboard must be reached through lvh.me, not localhost) and previews at
+# http://<runId>.preview.lvh.me:3333.
 
 vmType: "vz"
 cpus: 4

@@ -125,11 +125,12 @@ async function launch() {
     />
 
     <section class="k-card p-6">
-      <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-5 w-full">
         <!-- 1. Select a GitHub project -->
         <UFormField
           label="GitHub project"
           required
+          class="max-w-md"
         >
           <USelectMenu
             v-model="repo"
@@ -137,6 +138,7 @@ async function launch() {
             label-key="fullName"
             placeholder="Select a project…"
             size="lg"
+            class="w-full"
             block
           />
         </UFormField>
@@ -145,28 +147,33 @@ async function launch() {
         <UFormField
           label="Branch"
           required
+          class="max-w-md"
         >
           <USelectMenu
             v-model="branch"
             :items="branches"
             placeholder="Select a branch…"
             size="lg"
+            class="w-full"
             block
           />
         </UFormField>
 
         <!-- 3. Custom start command -->
         <UFormField
-          label="Start command"
-          hint="Runs inside the web container after ddev start (which happens automatically). Use plain container commands, not ddev: e.g. 'composer install' or 'npm i'."
+          label="Post start command"
+          class="max-w-md"
         >
           <UInput
             v-model="startCommand"
             placeholder="composer install"
             size="lg"
+            class="max-w-md"
             block
           />
         </UFormField>
+        <!-- TODO: use better positioning -->
+        <small>Runs inside the web container after ddev start (which happens automatically)</small>
 
         <!-- 4. .env values -->
         <UFormField label=".env values">

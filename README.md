@@ -1,14 +1,19 @@
 # Quick DDEV previews
 
-A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS or a MacMini, connect GitHub repositories and launch quick DDEV previews of any branch, which can be shared secretly with testers, clients or coworkers.
+A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS or a MacMini, connect GitHub repositories and launch quick DDEV previews of any branch - which can be shared securely with testers, clients or coworkers.
 
 ## 🚧 (Experimental) fork of Knecht Cloud 🚧
 
-This project is a fork of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör. 
+This is a fork of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör. 
 
+Significant changes made:
+
+- Added a "create preview" feature
+- Registration flow changed to email/password first
 
 > [!WARNING]
-> Experimental, use at your own risk. Under active development. No warranties given.
+> Experimental, use at your own risk. This project is an early preview and proof of concept - no warranties given.
+
 
 ## Screenshots
 
@@ -21,13 +26,16 @@ Example of Craft CMS backend:
 Jump into the web or db container and run commands like `php craft up`: 
 ![Screenshot](screenshot_terminal.jpg)
 
-## Install
+## Install on a VPS (not tested yet)
 
-On a fresh Ubuntu 24.04 server (as root):
+On a fresh Ubuntu 24.04 server, e.g. a Hetzner Cloud VPS, (as root):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | bash
 ```
+
+> [!WARNING]
+> Experimental, use at your own risk. Under active development / early proof of concept. No warranties given.
 
 The installer asks how the instance should be reached:
 
@@ -62,11 +70,12 @@ QDP_DOMAIN=previews.example.com bash <(curl -fsSL <repo-url>/scripts/install.sh)
 QDP_MODE=lvhme bash <(curl -fsSL <repo-url>/scripts/install.sh)
 ```
 
-## Install on macOS (e.g. a Mac mini)
+## Selfhost / install on macOS (e.g. a Mac mini)
 
 The run substrate (host Docker + ddev) is Linux-only, so on a Mac the same
-setup runs inside a [Lima](https://lima-vm.io) VM. Create the VM from the
-checked-in template, then run the installer inside it:
+setup runs inside a [Lima](https://lima-vm.io) VM. 
+
+Create the VM from the checked-in template, then run the installer inside it:
 
 ```bash
 brew install lima
@@ -117,10 +126,6 @@ curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/
 ```
 
 > [!NOTE]
-> The GitHub App manifest flow needs a publicly reachable callback URL, so
-> connecting GitHub won't work in lvh.me mode. Previews themselves work
-> locally without it.
->
 > GitHub webhooks cannot reach a local instance, so GitHub triggers won't work.
 
 ## Development
@@ -131,15 +136,28 @@ development there is a Lima VM that provides exactly that.
 ### On macOS via the Lima dev VM
 
 ```bash
-# Install dependencies (on the Mac)
-npm install
-
-# Prepare the environment
+# Prepare the environment (on the Mac)
 cp .env.example .env   # adjust the values (see the comments in the file)
-
-# Run database migrations
-npm run db:migrate
 ```
+
+For the VM flow set these two (the session cookie is scoped to the base
+domain, so the dashboard must be reached through it, not through localhost):
+
+```bash
+# .env
+QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me
+QUICKDDEVPREVIEWS_BASE_URL=http://lvh.me:3333
+```
+
+- `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` scopes the login cookie to `lvh.me`
+  so the preview subdomains (`<runId>.preview.lvh.me`) share it with the
+  dashboard.
+- `QUICKDDEVPREVIEWS_BASE_URL` is the full origin for server-side links
+  (invites, GitHub App callbacks); point it at the dev VM's reachable origin.
+
+Optional: `npm install` on the Mac gives you editor tooling (typecheck, lint).
+The dev server itself runs in the VM with its own install, so this is not
+required to run the app.
 
 Then create and provision the Linux dev VM (the run substrate, same as a
 production VPS), once:
@@ -161,11 +179,13 @@ mounted into the VM at the identical path):
 npm run dev:vm
 ```
 
-Lima auto-forwards the dev server port to the Mac: the UI is at
-`http://localhost:3333` and previews at `http://<runId>.preview.lvh.me:3333`
-(set `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` in `.env` first). If `lvh.me`
+Lima auto-forwards the dev server port to the Mac: with
+`QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` set, the UI is at
+`http://lvh.me:3333` (not `localhost:3333`: the session cookie is scoped to
+`lvh.me`, so a `localhost` page never holds the login) and previews at
+`http://<runId>.preview.lvh.me:3333`. If `lvh.me`
 doesn't resolve, set your Mac's DNS to Google (8.8.8.8) or Cloudflare
-(1.1.1.1), or add a rebind exception for `lvh.me`.
+(1.1.1.1), or add a rebind exception for `lvh.me`. (Common problem with FritzBox)
 
 > [!NOTE]
 > Running project environments requires a Linux host with Docker and ddev.

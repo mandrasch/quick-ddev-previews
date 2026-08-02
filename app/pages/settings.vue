@@ -258,7 +258,7 @@ watch(sshTarget, (val) => {
         <UInput
           v-model="sshTarget"
           type="text"
-          placeholder="knecht@my-server.com"
+          placeholder=""
           class="mt-4 max-w-md"
           block
         />
