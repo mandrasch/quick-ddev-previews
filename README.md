@@ -17,7 +17,8 @@ Significant changes made:
 
 ## Demo video
 
-- **[PoC: Quick (selfhosted) DDEV previews for PHP projects - Craft CMS example](https://www.youtube.com/watch?v=sS0WUtyXYm4&feature=youtu.be)** - youtube.com
+- [PoC: Quick DDEV previews - on a hetzner VPS](https://www.youtube.com/watch?v=FRNQ9RinErQ) - youtube.com
+- [PoC: Quick (selfhosted) DDEV previews - local installation](https://www.youtube.com/watch?v=sS0WUtyXYm4&feature=youtu.be) - youtube.com
 
 ## Screenshots
 
