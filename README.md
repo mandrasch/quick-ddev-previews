@@ -8,7 +8,7 @@ This is a fork of https://github.com/knecht-works/knecht-cloud, a project made b
 
 Significant changes made:
 
-- Added a "create preview" feature
+- Added a "create preview" feature, strip other features
 - Registration flow changed to email/password first
 
 > [!WARNING]
@@ -192,7 +192,7 @@ doesn't resolve, set your Mac's DNS to Google (8.8.8.8) or Cloudflare
 > Details on host setup live in `.env.example` and the provisioning scripts
 > under `scripts/`.
 
-### On a plain Linux host
+### On a plain Linux host (not tested yet)
 
 If you already run Linux, skip Lima:
 
