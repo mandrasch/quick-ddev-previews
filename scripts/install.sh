@@ -194,6 +194,7 @@ else
   cat > "$INSTALL_DIR/.env" <<EOF
 # Written by scripts/install.sh. Keys are documented in .env.example.
 QUICKDDEVPREVIEWS_BASE_DOMAIN=$DOMAIN
+NUXT_SESSION_COOKIE_DOMAIN=$DOMAIN
 NUXT_SESSION_PASSWORD=$(openssl rand -base64 32)
 QUICKDDEVPREVIEWS_DATA_DIR=$DATA_DIR
 QUICKDDEVPREVIEWS_DB_PATH=$DATA_DIR/quickddevpreviews.db

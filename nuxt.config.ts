@@ -21,13 +21,14 @@ export default defineNuxtConfig({
   },
 
   // Scope the session cookie to the base domain so it is also sent to the
-  // per-run preview subdomains (Phase 2). Unset = host-only (dev). The CI-built
-  // release image builds without the env var; production overrides it at runtime
-  // via NUXT_SESSION_COOKIE_DOMAIN (docker-compose.yml derives it from .env).
+  // per-run preview subdomains. Unset = host-only (dev). Production sets
+  // NUXT_SESSION_COOKIE_DOMAIN (docker-compose.yml derives it from
+  // QUICKDDEVPREVIEWS_BASE_DOMAIN in .env); we also accept the latter as a
+  // fallback so a bare `docker run` without the compose override still works.
   runtimeConfig: {
     session: {
       cookie: {
-        domain: process.env.QUICKDDEVPREVIEWS_BASE_DOMAIN || undefined,
+        domain: process.env.NUXT_SESSION_COOKIE_DOMAIN || process.env.QUICKDDEVPREVIEWS_BASE_DOMAIN || undefined,
         secure: process.env.NODE_ENV === 'production',
       },
     },

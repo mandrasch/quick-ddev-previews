@@ -43,8 +43,8 @@ export function previewHostname(runId: number, baseHost: string, label?: string)
 
 // The label for one of the project's ddev hostnames: the default `.ddev.site`
 // suffix is dropped, remaining dots become dashes (they'd end the DNS label).
-// `knaus.kta.ddev.site` -> `knaus-kta`. Reverse lookup is by comparison against
-// the project's host set, never by parsing the label back.
+// `subdomain-a.my-project.ddev.site` -> `subdomain-a-my-project`. Reverse lookup
+// compares against the project's host set, never by parsing the label back.
 export function previewLabel(ddevHost: string): string {
   return ddevHost.replace(/\.ddev\.site$/, '').replaceAll('.', '-')
 }
