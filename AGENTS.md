@@ -4,8 +4,7 @@ Quick DDEV Previews: a self-hosted service that installs on a cheap Hetzner
 Cloud VPS, provides email/password registration, and (Phase 2) connects to
 GitHub to boot DDEV projects and generate preview environments.
 
-Reference project: `_reference-project/knecht-cloud/` (same tech stack, started
-with GitHub Auth; we moved that to a second step after registration).
+Reference project: `_reference-project/knecht-cloud/` or check https://github.com/knecht-works/knecht-cloud if the local folder is not available (same tech stack, started with GitHub Auth; we moved that to a second step after registration).
 
 ## Writing conventions
 
@@ -119,14 +118,106 @@ Caddy (TLS) --reverse_proxy--> quickddevpreviews:3000 (Nitro)
   (which happens automatically host-side). Default `composer install`; use
   plain container commands (`npm i`, `composer install`), NOT `ddev ...`.
 
-## Phase 4 next steps (planned, not started)
+## Phase 4 (next): Hetzner VPS demo install + end-to-end verification
 
+The sslip.io install path is correctly cookie-scoped (verified by code audit):
+the installer writes `<dashed-ip>.sslip.io` as `QUICKDDEVPREVIEWS_BASE_DOMAIN`
+(scripts/install.sh:184) and now also as `NUXT_SESSION_COOKIE_DOMAIN`
+(scripts/install.sh:197); nuxt.config.ts:30 reads the latter with a fallback
+to the former. h3 writes that as the `Domain=` attribute of the sealed
+`nuxt-session` cookie, which RFC 6265 suffix-matches every subdomain of
+`<dashed-ip>.sslip.io`, including `<runId>.preview.<dashed-ip>.sslip.io`. So
+the dashboard login carries over to previews (server/utils/preview-proxy.ts:54
+gates previews on the same cookie). The per-instance scope is also the only
+viable choice: `sslip.io` is on the Public Suffix List, so a `Domain=.sslip.io`
+cookie would be rejected by browsers, and bare `.sslip.io` would leak across
+unrelated instances. Pre-existing inconsistency fixed in this phase:
+docker-compose.yml:19 set `NUXT_SESSION_COOKIE_DOMAIN` but nuxt.config.ts:30
+read `QUICKDDEVPREVIEWS_BASE_DOMAIN`; it worked only because .env exposed the
+latter via `env_file`. Now nuxt.config accepts both names.
+
+### Provision the demo host
+
+- [ ] Provision a Hetzner Cloud CX22 (amd64) or CAX21 (arm64), Ubuntu 24.04.
+- [ ] Run `bash scripts/install.sh` with the default sslip mode; record the
+      derived `<dashed-ip>.sslip.io` base printed by the installer.
+- [ ] Snapshot the clean install for fast re-provision during testing.
+
+### Manual verification checklist
+
+- [ ] Dashboard `https://<dashed-ip>.sslip.io` loads with a Let's Encrypt cert
+      managed by Caddy (NOT an on-demand cert).
+- [ ] Register the first user (becomes owner); in Devtools > Application >
+      Cookies confirm `nuxt-session` carries `Domain=<dashed-ip>.sslip.io`,
+      `Secure`, `HttpOnly`, `SameSite=Lax`. The Domain row is the crux of the
+      preview-auth path; if it is host-only, previews will not see the cookie.
+- [ ] Settings > Create GitHub App: manifest flow completes and returns to the
+      dashboard; the githubApp row is populated.
+- [ ] `/runs/new`: pick a project, default `composer install`, launch; the run
+      reaches `previewReady`.
+- [ ] Open the preview link inside the dashboard iframe: it loads WITHOUT being
+      prompted to log in again. This proves the cookie subdomain sharing.
+- [ ] Incognito check: open the preview URL in an incognito window -> 302 to
+      `https://<dashed-ip>.sslip.io/login`; after logging in, bounce back to
+      the original preview URL via the `quickddevpreviews-redirect` cookie
+      (server/utils/preview-proxy.ts:66).
+- [ ] `/tls-ask?domain=<random-RunId>.preview.<dashed-ip>.sslip.io` returns 404
+      unless the run exists AND the host exactly equals
+      `previewHostname(runId, base, label)`. Guards against Let's Encrypt
+      quota draining via arbitrary subdomains (server/routes/tls-ask.get.ts).
+- [ ] Delete the run: its preview host returns 404/redirect and the on-demand
+      Caddy cert is left to lapse.
+
+### Brief security check (documented, no code audit pass in this phase)
+
+Authenticated surfaces:
+- Dashboard + `/api/**` gated by the sealed `nuxt-session` cookie
+  (server/middleware/auth.ts).
+- Previews gated by the SAME shared cookie (server/utils/preview-proxy.ts:54),
+  with a live membership re-check (server/utils/preview-proxy.ts:77-80) so
+  deleted/revoked users are kicked out even with a still-valid cookie.
+- preview-proxy removes the `set-cookie` response header after reading the
+  session (server/utils/preview-proxy.ts:59): without it, credential-less
+  subresource requests would emit an empty domain-scoped session cookie that
+  overwrites the operator's live session.
+
+Public surfaces:
+- `/tls-ask` is intentionally unauthenticated (Caddy calls it pre-session).
+  Protected by run-existence + canonical suffix-equality
+  (server/routes/tls-ask.get.ts:19-21): only `<runId>.preview.<THIS base>`
+  for an existing run qualifies.
+
+Secrets:
+- scrypt password hashing (Node built-in, no native dep).
+- `NUXT_SESSION_PASSWORD` seals the session cookie AND derives the AES-256-GCM
+  key that encrypts the GitHub App creds at rest (githubApp table).
+
+Isolation:
+- Per-instance `<dashed-ip>.sslip.io` cookie scope: no cross-instance leakage,
+  and not cookieable from `sslip.io` bare (public suffix).
+- preview middleware parses `<id>.preview.` without re-checking the base
+  suffix (server/middleware/preview.ts:8); the on-demand TLS ask endpoint
+  enforces the suffix first, and the app port is bound to localhost
+  (docker-compose.yml), so this is low practical risk.
+
+Residual risks to track (not addressed in this phase):
+- No rate limiting on login / invite / tls-ask endpoints.
+- Single VPS = no run-to-run isolation beyond Docker: a hostile project's
+  start command runs as root inside its own ddev web container.
+- Idle-stop / archive / retention is not implemented (see Phase 5), so any
+  shared-tester access (Phase 7) must wait on that lifecycle.
+
+## Phase 5 (next): lifecycle, db dump, framework detection, run controls
+
+- [ ] .env-editor which can edit the file anytime, not just on preview instance launch
+- [ ] button for git pull, if branch changes
+- [ ] vscode-server integration (see knecht-cloud)
 - [ ] Idle-stop / archive / restore lifecycle (reapIdleEnvs, retention ladder)
 - [ ] DB dump upload + import (`ddev import-db`), shared folders
 - [ ] Framework detection chips (typo3/craft/laravel) on the launcher
 - [ ] Retry / reboot / cancel buttons on the run page
 
-## Phase 4 next: publish the Docker image via GitHub Actions (done, one manual step)
+## Phase 6 (done, one manual step): publish the Docker image via GitHub Actions
 
 The image-publishing pipeline is in place (`ghcr.io/mandrasch/quick-ddev-previews`):
 
@@ -155,7 +246,7 @@ when `docker compose pull` fails), so a fresh VPS works without any published
 image. A stable release tag publishes the multi-arch image, after which fresh
 servers pull instead of build.
 
-## Phase 5: Access for testers (UX research needed)
+## Phase 7: Access for testers (UX research needed)
 
 There is research needed to let external testers access projects: Invite them via email? Share a secure link?
 
@@ -171,4 +262,4 @@ Another discussion for this is: Should the runs/previews be numbered like 1.lvh.
 - Lime primary color (carried over from the reference project)
 - Settings/invites UI only visible to the owner
 - Installer builds from source until a release image is published (GH Actions
-  pipeline is a Phase 4 task, see above)
+  pipeline is a Phase 6 task, see above)
