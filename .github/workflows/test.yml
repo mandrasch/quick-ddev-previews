@@ -1,0 +1,43 @@
+# The fast suite: lint + typecheck + vitest unit tests. No Docker, no ddev,
+# no secrets: safe to run for every push and PR. Doc-only changes skip CI.
+name: test
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Node 22 bundles npm 10, but the lock file is written by npm 11 (the
+      # version the prod image pins, see Dockerfile) and npm 10 rejects its
+      # optional-peer resolution. Same npm everywhere.
+      - run: npm install -g npm@11.9.0
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm test

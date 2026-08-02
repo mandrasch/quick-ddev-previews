@@ -1,0 +1,104 @@
+# Release pipeline. Push a tag and everything else follows:
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Pre-releases: any tag with a hyphen (v0.3.0-rc.1) runs the same pipeline but
+# marks the GitHub Release as a prerelease and does NOT move the `latest`
+# image tag. Note: doc-only commits can't skip this build, GitHub does not
+# evaluate paths filters for tag pushes; a tag is explicit release intent.
+#
+# Builds the prod image for amd64 and arm64 (each on a native runner; the Nuxt
+# build is far too slow under QEMU), merges the two into one multi-arch
+# manifest on GHCR (the version tag + latest), and creates the GitHub Release.
+# The per-arch tags (vX.Y.Z-amd64/-arm64) stay behind on GHCR as build
+# artifacts; servers always pull the merged tag. The Release matters beyond
+# ceremony: the in-app updater polls releases/latest, which only sees actual
+# Releases, not bare tags, and the dashboard renders each Release body as the
+# changelog. The body is generated below as a plain commit-subject list since
+# the previous release tag: this repo commits straight to main, so GitHub's
+# --generate-notes (PR-based) would come up empty. Keep the body a plain
+# "- subject" list. One-time setup: the ghcr.io package must be set to public
+# visibility after the first push, or anonymous pulls on servers fail.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write   # gh release create
+  packages: write   # ghcr.io push
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: prod
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          build-args: |
+            QUICKDDEVPREVIEWS_VERSION=${{ github.ref_name }}
+          tags: ghcr.io/mandrasch/quick-ddev-previews:${{ github.ref_name }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history + tags: the changelog step diffs against the previous
+          # release tag.
+          fetch-depth: 0
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge the per-arch images into the release manifest
+        run: |
+          LATEST="-t ghcr.io/mandrasch/quick-ddev-previews:latest"
+          case "$GITHUB_REF_NAME" in *-*) LATEST="" ;; esac
+          docker buildx imagetools create \
+            -t "ghcr.io/mandrasch/quick-ddev-previews:$GITHUB_REF_NAME" \
+            $LATEST \
+            "ghcr.io/mandrasch/quick-ddev-previews:$GITHUB_REF_NAME-amd64" \
+            "ghcr.io/mandrasch/quick-ddev-previews:$GITHUB_REF_NAME-arm64"
+
+      # The changelog: the user-facing (feat/fix) commits since the previous
+      # release tag, grouped by scripts/changelog-preview.sh: the same script
+      # that previews the notes locally, so what you preview is what ships.
+      - name: Build release notes from commits
+        run: |
+          bash scripts/changelog-preview.sh '' "$GITHUB_REF_NAME" > /tmp/notes.md
+          echo "Notes (-> $GITHUB_REF_NAME):" && cat /tmp/notes.md
+
+      - run: |
+          PRERELEASE=""
+          case "$GITHUB_REF_NAME" in *-*) PRERELEASE="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" $PRERELEASE --title "$GITHUB_REF_NAME" --notes-file /tmp/notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
