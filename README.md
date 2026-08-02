@@ -29,9 +29,9 @@ Example of Craft CMS backend:
 Jump into the web or db container and run commands like `php craft up`: 
 ![Screenshot](screenshot_terminal.jpg)
 
-## Install on a VPS (not tested yet)
+## Install on a VPS
 
-On a fresh Ubuntu 24.04 server, e.g. a Hetzner Cloud VPS, (as root):
+On a fresh Ubuntu 24.04 server, e.g. a Hetzner Cloud VPS CX23, (as root):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | bash
@@ -45,7 +45,7 @@ The installer asks how the instance should be reached:
 ```
 How do you want to reach this instance?
   1) sslip.io auto-domain (zero DNS; recommended for a VPS) [default]
-  2) A real domain you own (e.g. previews.example.com)
+  2) A real domain you own (e.g. previews.example.com) - not tested yet
   3) lvh.me (local previews on a Mac/Lima VM; internal TLS)
 ```
 
