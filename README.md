@@ -9,6 +9,7 @@ This is a fork of https://github.com/knecht-works/knecht-cloud, a project made b
 Significant changes made:
 
 - Added a "create preview" feature, strip other features
+- Add support for `sslip.io`, so no external domain required on install
 - Registration flow changed to email/password first
 
 > [!WARNING]
