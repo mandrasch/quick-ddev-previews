@@ -15,23 +15,46 @@ Significant changes made:
 > [!WARNING]
 > Experimental, use at your own risk. This project is an early preview and proof of concept - no warranties given.
 
-## Demo video
+## Demo videos
 
 - [PoC: Quick DDEV previews - on a hetzner VPS](https://www.youtube.com/watch?v=FRNQ9RinErQ) - youtube.com
 - [PoC: Quick (selfhosted) DDEV previews - local installation](https://www.youtube.com/watch?v=sS0WUtyXYm4&feature=youtu.be) - youtube.com
 
 ## Screenshots
 
-Create preview from any branch:
-![Screenshot](screenshot_create_preview.jpg)
-Example of Craft CMS frontend:
-![Screenshot](screenshot_craft_frontend.jpg)
-Example of Craft CMS backend:
-![Screenshot](screenshot_craft_backend.jpg)
-Jump into the web or db container and run commands like `php craft up`: 
-![Screenshot](screenshot_terminal.jpg)
+Create preview from any branch:<br>
+<img src="screenshot_create_preview.jpg" alt="Create preview from any branch" width="500">
 
-## Install on a VPS
+Example of Craft CMS frontend:<br>
+<img src="screenshot_craft_frontend.jpg" alt="Example of Craft CMS frontend" width="500">
+
+Example of Craft CMS backend:<br>
+<img src="screenshot_craft_backend.jpg" alt="Example of Craft CMS backend" width="500">
+
+Jump into the web or db container and run commands like `php craft up`:<br>
+<img src="screenshot_terminal.jpg" alt="Jump into the web or db container" width="500">
+
+## Choose your path
+
+There are two ways to run quickddevpreviews:
+
+- **The installer** (`scripts/install.sh`): builds and runs the packaged app behind Caddy TLS. Use it on a VPS or a Mac at home.
+- **The dev VM** (`npm run dev:vm`): runs the source with hot reload, for developing the code. No installer involved.
+
+| I want to... | Go to | Summary |
+|---|---|---|
+| Run the service on a VPS | [Install on a VPS](#install-on-a-vps-production) | one-liner installer, mode 1/2 |
+| Run the service on a Mac at home | [Self-host on a Mac](#self-host-on-a-mac-home-server) | Lima VM + installer, mode 3 (local) or 1/2 (public) |
+| Develop / test new features | [Develop locally](#develop-locally-build-new-features) | Lima dev VM, source with HMR |
+
+### Lima templates at a glance
+
+Both templates create an Ubuntu VM on macOS (the run substrate is Linux-only), but for different purposes:
+
+- `scripts/lima-prod.yaml` (VM `quickddevpreviews`): a production host. You run `install.sh` inside it, exactly like on a VPS. Nothing is shared with the Mac.
+- `scripts/lima-dev.yaml` (VM `quickddevpreviews-dev`): a development VM. Your repo checkout is shared read/write into it and the Nuxt dev server runs inside. The installer is not used.
+
+## Install on a VPS (production)
 
 On a fresh Ubuntu 24.04 server, e.g. a Hetzner Cloud VPS CX23, (as root):
 
@@ -56,6 +79,7 @@ How do you want to reach this instance?
 - **2** prompts for your domain; you point DNS records at the box.
 - **3** uses `lvh.me` with Caddy's internal CA: all preview subdomains resolve
   to 127.0.0.1, so the whole thing works on one machine with no public access.
+  This mode is for the local Mac case below, not a VPS: on a VPS pick **1** or **2**.
 
 It installs Docker, clones the repo, writes `.env`, and starts the app with
 Caddy TLS.
@@ -75,7 +99,7 @@ QDP_DOMAIN=previews.example.com bash <(curl -fsSL <repo-url>/scripts/install.sh)
 QDP_MODE=lvhme bash <(curl -fsSL <repo-url>/scripts/install.sh)
 ```
 
-## Selfhost / install on macOS (e.g. a Mac mini)
+## Self-host on a Mac (home server)
 
 The run substrate (host Docker + ddev) is Linux-only, so on a Mac the same
 setup runs inside a [Lima](https://lima-vm.io) VM. 
@@ -84,7 +108,7 @@ Create the VM from the checked-in template, then run the installer inside it:
 
 ```bash
 brew install lima
-limactl create --name=quickddevpreviews https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/lima-server.yaml
+limactl create --name=quickddevpreviews https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/lima-prod.yaml
 limactl start quickddevpreviews
 limactl shell quickddevpreviews
 # inside the VM:
@@ -133,10 +157,11 @@ curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/
 > [!NOTE]
 > GitHub webhooks cannot reach a local instance, so GitHub triggers won't work.
 
-## Development
+## Develop locally (build new features)
 
-quickddevpreviews needs a Linux host with Docker and the ddev CLI. For local
-development there is a Lima VM that provides exactly that.
+This is for building the code, not for running the installed product (that is
+the installer path above). quickddevpreviews needs a Linux host with Docker and
+the ddev CLI, so local development runs inside a Lima VM.
 
 ### On macOS via the Lima dev VM
 
@@ -168,7 +193,7 @@ Then create and provision the Linux dev VM (the run substrate, same as a
 production VPS), once:
 
 ```bash
-limactl create --name=quickddevpreviews-dev scripts/lima-vm.yaml
+limactl create --name=quickddevpreviews-dev scripts/lima-dev.yaml
 limactl start quickddevpreviews-dev
 limactl shell quickddevpreviews-dev -- ./scripts/provision-host.sh
 ```
@@ -188,14 +213,36 @@ Lima auto-forwards the dev server port to the Mac: with
 `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` set, the UI is at
 `http://lvh.me:3333` (not `localhost:3333`: the session cookie is scoped to
 `lvh.me`, so a `localhost` page never holds the login) and previews at
-`http://<runId>.preview.lvh.me:3333`. If `lvh.me`
-doesn't resolve, set your Mac's DNS to Google (8.8.8.8) or Cloudflare
-(1.1.1.1), or add a rebind exception for `lvh.me`. (Common problem with FritzBox)
+`http://<runId>.preview.lvh.me:3333`. If `lvh.me` doesn't resolve, see the DNS
+note in the [Mac section](#self-host-on-a-mac-home-server) above.
 
 > [!NOTE]
 > Running project environments requires a Linux host with Docker and ddev.
 > Details on host setup live in `.env.example` and the provisioning scripts
 > under `scripts/`.
+
+### Quick loop: test a feature branch
+
+The repo is shared read/write into the VM, so switching branches is a local git
+operation and the dev server hot-reloads your changes:
+
+```bash
+git switch my-feature   # on the Mac; the VM sees it
+npm run dev:vm          # restart after schema or dependency changes
+```
+
+- If the branch changed `package.json`, reinstall inside the VM before
+  restarting: open a shell (`limactl shell quickddevpreviews-dev`) and run
+  `npm ci` in the repo directory.
+- New migrations under `server/db/migrations` auto-apply when the dev server
+  (re)starts (`server/plugins/migrate.ts`). Regenerate one after editing the
+  schema with `npm run db:generate`; wipe the dev DB with `npm run db:reset`.
+- Previews are at `http://<runId>.preview.lvh.me:3333`.
+- Low on internal disk? Put the VM state on an external drive: set
+  `export LIMA_HOME=/Volumes/<HDD>/lima` in `~/.zshrc` **before** creating the
+  VM, and the VM disk + Docker/ddev images live there (a spinning HDD is
+  slower, an SSD is best). The repo itself stays on the Mac.
+- Done for the day: `limactl stop quickddevpreviews-dev`.
 
 ### On a plain Linux host (not tested yet)
 

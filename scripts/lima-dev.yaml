@@ -2,7 +2,7 @@
 # Linux-only, so on macOS development happens inside this Ubuntu VM, the same
 # substrate as the production VPS. Create + provision:
 #
-#   limactl create --name=quickddevpreviews-dev scripts/lima-vm.yaml
+#   limactl create --name=quickddevpreviews-dev scripts/lima-dev.yaml
 #   limactl start quickddevpreviews-dev
 #   limactl shell quickddevpreviews-dev -- ./scripts/provision-host.sh
 #   npm run dev:vm
