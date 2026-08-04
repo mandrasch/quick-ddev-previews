@@ -6,9 +6,9 @@
 #
 # Interactive: asks how the instance should be reached (sslip.io auto-domain /
 # real domain / lvh.me local previews). Non-interactive overrides:
-#   QDP_DOMAIN=<domain>   use a real domain (skips the menu)
-#   QDP_MODE=sslip|domain|lvhme   force a mode (no TTY: defaults to sslip)
-#   QDP_REF=<branch/tag>  testing: checks out that ref
+#   QUICKDDEVPREVIEWS_DOMAIN=<domain>   use a real domain (skips the menu)
+#   QUICKDDEVPREVIEWS_MODE=sslip|domain|lvhme   force a mode (no TTY: defaults to sslip)
+#   QUICKDDEVPREVIEWS_REF=<branch/tag>  testing: checks out that ref
 #
 # What it does:
 #   1. Reserves uid 1000 (the `quickddevpreviews` user): the container runs
@@ -23,11 +23,11 @@
 # prompts, ddev) can consume the bytes that were the REST of the script,
 # ending the install silently. Fix: on first run, slurp stdin into a temp
 # file and re-exec bash on it. From then on the script reads from a file, so
-# no child can ever touch it. QDP_SELF marks the re-exec'd copy.
-if [ "${QDP_SELF:-}" != "1" ]; then
+# no child can ever touch it. QUICKDDEVPREVIEWS_SELF marks the re-exec'd copy.
+if [ "${QUICKDDEVPREVIEWS_SELF:-}" != "1" ]; then
   TMP_SELF="$(mktemp)"
   cat > "$TMP_SELF"
-  exec env QDP_SELF=1 bash "$TMP_SELF" "$@"
+  exec env QUICKDDEVPREVIEWS_SELF=1 bash "$TMP_SELF" "$@"
 fi
 
 set -euo pipefail
@@ -81,13 +81,13 @@ else
   git clone "$REPO_URL" "$INSTALL_DIR" < /dev/null
 fi
 
-if [ -n "${QDP_REF:-}" ]; then
-  TAG="$QDP_REF"
-  case "$QDP_REF" in
-    v*) IMAGE_TAG="$QDP_REF" ;;
+if [ -n "${QUICKDDEVPREVIEWS_REF:-}" ]; then
+  TAG="$QUICKDDEVPREVIEWS_REF"
+  case "$QUICKDDEVPREVIEWS_REF" in
+    v*) IMAGE_TAG="$QUICKDDEVPREVIEWS_REF" ;;
     *) IMAGE_TAG="latest" ;;
   esac
-  echo "⚠ QDP_REF=$QDP_REF (testing mode, image tag: $IMAGE_TAG)"
+  echo "⚠ QUICKDDEVPREVIEWS_REF=$QUICKDDEVPREVIEWS_REF (testing mode, image tag: $IMAGE_TAG)"
 else
   # `|| true`: with set -euo pipefail, an empty tag list makes `grep -v` exit 1
   # (nothing matched), which would kill the install before the fallback below.
@@ -101,7 +101,7 @@ else
   fi
 fi
 say "Checking out $TAG"
-# A version tag pins an immutable commit; a branch name (main, or a QDP_REF
+# A version tag pins an immutable commit; a branch name (main, or a QUICKDDEVPREVIEWS_REF
 # branch) must resolve to the REMOTE ref, not a possibly-stale local branch:
 # a previous run that edited files in place (e.g. the old placeholder repo
 # URL) leaves local commits on main that `git fetch` won't overwrite, and
@@ -127,7 +127,7 @@ mkdir -p "$PROJECTS_DIR"
 chown -R 1000:1000 "$PROJECTS_DIR"
 
 # ── 4. .env ───────────────────────────────────────────────────────────────────
-# Three deployment modes, chosen interactively (or via QDP_DOMAIN / QDP_MODE):
+# Three deployment modes, chosen interactively (or via QUICKDDEVPREVIEWS_DOMAIN / QUICKDDEVPREVIEWS_MODE):
 #   1) sslip.io auto-domain   zero DNS, for a VPS with a public IP   (default)
 #   2) a real domain          the user points DNS records at the box
 #   3) lvh.me                 local previews on a Mac/Lima VM (internal TLS)
@@ -135,11 +135,11 @@ if [ -f "$INSTALL_DIR/.env" ]; then
   ok ".env exists, keeping it"
 else
   # A real domain given via env skips the menu (non-interactive installs).
-  DOMAIN="${QDP_DOMAIN:-}"
+  DOMAIN="${QUICKDDEVPREVIEWS_DOMAIN:-}"
   if [ -n "$DOMAIN" ]; then
     MODE="domain"
-  elif [ -n "${QDP_MODE:-}" ]; then
-    MODE="$QDP_MODE"
+  elif [ -n "${QUICKDDEVPREVIEWS_MODE:-}" ]; then
+    MODE="$QUICKDDEVPREVIEWS_MODE"
   elif [ -e /dev/tty ]; then
     echo
     echo "How do you want to reach this instance?"
@@ -184,7 +184,7 @@ else
         DOMAIN="${DASHED_IP}.sslip.io"
         ok "Derived domain: $DOMAIN"
       else
-        die "Could not determine public IP. Set QDP_DOMAIN=<your-domain> and re-run."
+        die "Could not determine public IP. Set QUICKDDEVPREVIEWS_DOMAIN=<your-domain> and re-run."
       fi
       ;;
   esac

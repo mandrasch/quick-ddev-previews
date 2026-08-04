@@ -39,8 +39,9 @@ The installer (`scripts/install.sh`) asks how the instance is reached:
   2) a real domain (user DNS records)
   3) lvh.me (local previews on a Mac/Lima VM; swaps in Caddyfile.lvhme with
      Caddy's internal CA, since Let's Encrypt can't issue for 127.0.0.1)
-Non-interactive: `QDP_DOMAIN=<domain>` forces mode 2; `QDP_MODE=sslip|domain|
-lvhme` forces any; no TTY (CI) defaults to sslip. The session cookie must be
+Non-interactive: `QUICKDDEVPREVIEWS_DOMAIN=<domain>` forces mode 2;
+`QUICKDDEVPREVIEWS_MODE=sslip|domain|lvhme` forces any; no TTY (CI) defaults to
+sslip. The session cookie must be
 scoped to the base domain (`NUXT_SESSION_COOKIE_DOMAIN`) so the per-run
 preview subdomains (`<runId>.preview.<base>`) share it with the dashboard.
 
