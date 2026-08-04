@@ -252,6 +252,218 @@ There is research needed to let external testers access projects: Invite them vi
 
 Another discussion for this is: Should the runs/previews be numbered like 1.lvh.me, 2.lvh.me - or would a random word string (or user given string) be better for user experience. We need to check solutions like GitHub Codespaces.
 
+## Phase 8: Preview visibility modes + custom subdomains
+
+Two related changes that together answer the Phase 7 question "how do testers
+access previews": custom human-readable subdomains and per-run visibility
+modes (private default, password-protected, public).
+
+### Custom subdomains (Option A: `<slug>.preview.<base>`)
+
+Today every preview is at `<runId>.preview.<base>`. The runId is an
+auto-increment integer, not human-readable. This phase adds an optional
+per-run `slug` so a preview can live at `<slug>.preview.<base>` instead
+(e.g. `myfeature.preview.<base>`). The `.preview.` infix is kept: it keeps
+the slug space disjoint from dashboard routes at bare `<base>`, and the
+cookie subdomain scoping (`Domain=<base>`) is unchanged.
+
+Schema (`runs` table):
+- `slug text unique` (nullable; when null, the run uses its `runId` as today)
+- Slug rules: `[a-z0-9-]`, 1-63 chars, no leading/trailing hyphen, no `--`
+  (collides with the `<label>--<runId>` separator at `preview-host.ts:12`).
+  Reserved-name blocklist is unnecessary because the `.preview.` infix keeps
+  slug space disjoint from app routes.
+
+Code changes (all host knowledge is centralized in
+`shared/utils/preview-host.ts` plus one duplicated copy in the `BRIDGE_SCRIPT`
+at `preview-proxy.ts:32`):
+- `preview-host.ts:12`: broaden the regex to accept either digits (legacy
+  `<runId>`) or a slug (`[a-z][a-z0-9-]*`). `parsePreviewHost` returns
+  `{ runId?: number, slug?: string, label?: string }`. Callers resolve the
+  run by whichever key is present.
+- `preview-host.ts:40`: `previewHostname` accepts either a runId or a slug.
+- `preview-proxy.ts:32`: the `BRIDGE_SCRIPT` regex must be updated in
+  lockstep.
+- `server/routes/tls-ask.get.ts:19-21`: canonicalize using the slug (or
+  runId) and require exact equality, same as today.
+- `server/middleware/preview.ts:9`: pass both slug and runId downstream.
+- `server/utils/preview-proxy.ts:82`: look up run by slug when present, by
+  id otherwise. New helper `getRunBySlug`.
+- `server/daemon/ddev.ts:100-104`: the slug must be known at boot time so
+  the env URL translator uses it.
+- `app/components/KPreviewBrowser.vue:50`: the postMessage origin guard
+  compares runId; needs to compare slug too (or resolve slug -> runId first).
+- Launcher (`server/api/runs/launch.post.ts`): accept an optional `slug`
+  field. Catch `SQLITE_CONSTRAINT_UNIQUE` and reject or append a suffix.
+- UI (`app/pages/runs/new.vue`): add a slug input field with live
+  availability check. When visibility is `public`, offer two slug
+  strategies: auto-generated random slug (unguessable, acts as a secret
+  link) or user-chosen custom slug (human-readable, truly public).
+
+The Caddyfile needs no change: the existing `on_demand_tls` block already
+routes every unknown SNI through `tls-ask`, which becomes the sole arbiter
+of what gets a cert.
+
+Backward compatibility: every existing run has `slug = null` and keeps
+working at `<runId>.preview.<base>`. New runs can opt into a slug.
+
+### Visibility modes
+
+Today every preview is login-gated (any logged-in admin can view any
+preview). This phase adds a per-run `visibility` column with three modes:
+
+- `private` (default): current behavior. Logged-in admins only. No change
+  for existing runs.
+- `password`: anyone with the run-specific password. The URL (with its
+  slug) can be shared freely; the password gates access. Replaces the
+  dropped "view users" idea.
+- `public`: no gate at all. Anyone with the URL can view. At launch time
+  the owner chooses the slug strategy:
+  - Auto-generated random slug (e.g. `tx7k2m9p`): the URL itself is the
+    secret. This is the "secret link" pattern from the original Phase 7
+    discussion, without needing a separate visibility mode.
+  - User-chosen custom slug (e.g. `myfeature`): human-readable, truly
+    public. Anyone who can guess or discover the slug can view.
+
+Schema (`runs` table):
+- `visibility text not null default 'private'` enum of
+  `'private' | 'password' | 'public'`.
+- `previewPasswordHash text` (nullable; scrypt hash, same scheme as user
+  passwords. Present only when `visibility = 'password'`).
+- `previewPasswordVersion integer not null default 0` (bumped on password
+  change to invalidate existing preview-password cookies).
+
+Gate logic (`server/utils/preview-proxy.ts:53-80`), restructured:
+
+1. Look up the run first (moved up from line 82, needed to read visibility).
+2. `private`: current behavior. `getUserSession`, membership re-check,
+   bounce to `/login` on no session.
+3. `password`:
+   - If a valid admin session exists (`nuxt-session` with live membership
+     re-check): pass through. Admins skip the password.
+   - Else check the preview-password cookie `qdp-preview-pw`
+     (`Domain=preview.<base>`, value = `HMAC-SHA256({runId}:{version}:`
+     `{expiresAt}, NUXT_SESSION_PASSWORD)`). Verify HMAC, runId match,
+     version match, expiry.
+   - If cookie valid: pass through. Strip `qdp-preview-pw` from forwarded
+     headers so the ddev app never sees it.
+   - Else: HTML requests get a password prompt page (served by the proxy,
+     not the app); non-HTML get 401.
+   - Password form POSTs to `/__qdp_preview_auth__` on the same preview
+     host. Proxy verifies password against `previewPasswordHash`, sets
+     `qdp-preview-pw` cookie on success, 302-redirects to original URL.
+4. `public`: do NOT call `getUserSession` (avoids the empty-cookie-overwrite
+   bug at `preview-proxy.ts:55-59`). Skip the session gate entirely. Keep
+   the `envState === 'up'` and existence checks.
+
+Password-prompt cookie design:
+- Name: `qdp-preview-pw`.
+- Domain: `preview.<base>` (NOT `<base>`, so it never reaches the dashboard;
+  NOT host-only, so it covers label variants like
+  `<label>--<slug>.preview.<base>`).
+- Value: HMAC-SHA256 signed token as above. Cannot be forged without
+  `NUXT_SESSION_PASSWORD`. A cookie for run A is sent to run B (same
+  Domain) but the runId check rejects it -> password prompt.
+- `HttpOnly: true`, `SameSite: lax`, `Secure: true`, `Path: /`.
+- maxAge: 7 days (configurable). No sliding renewal.
+- Distinct from `nuxt-session` (admin cookie); names and domains differ, no
+  interference.
+
+Brute-force protection (in-memory, per-run):
+- `Map<runId, { count, lockedUntil }>` in the proxy module.
+- Lockout after 5 wrong attempts for 60 seconds.
+- Lost on restart (acceptable; a DB-persisted counter can wait for a later
+  security hardening phase).
+
+Security notes:
+- `public` mode: no auth gate. The proxied app serves whatever its start
+  command produced to anyone with the URL. Only set `public` on trusted
+  runs. Same residual risk as today (any admin can see any run), but wider
+  audience.
+- `password` mode: the password is the only barrier for non-admins. Use a
+  strong password. In-memory rate limiting mitigates brute force but does
+  not prevent it entirely; a future phase should add DB-persisted attempt
+  tracking and exponential backoff.
+- Revocation: change the password -> `previewPasswordVersion` bumps -> all
+  existing `qdp-preview-pw` cookies for that run are invalid immediately.
+
+UI changes:
+- Launcher (`app/pages/runs/new.vue`): add visibility selector
+  (private / password / public), password field (shown when `password` is
+  selected), slug field. When visibility is `public`, offer the two slug
+  strategies (auto-generated random vs custom).
+- Run detail (`app/pages/runs/[id].vue`): show visibility badge, allow
+  changing visibility/password post-launch. Show the shareable URL.
+- Settings: no changes (visibility is per-run, not global).
+
+## Phase 9: Single-admin role model (follow-up)
+
+The original Feature 3 proposed separating "creators" from "view-only users"
+with per-preview grants. This is dropped. All dashboard users are admins:
+any logged-in user can create runs, manage settings, invite others, and
+connect/disconnect the GitHub App. Per-preview access for non-dashboard
+users (testers) is handled entirely by Phase 8's visibility modes (password
+/ public), not by dashboard-level roles.
+
+Current state:
+- `isOwner` boolean on `users` (`schema.ts:19`). First user gets
+  `isOwner = true` at registration (`server/api/_setup/register.post.ts:70`).
+- 8 endpoints are owner-only: `PATCH /api/settings`,
+  `POST /api/users/invite`, `GET /api/users`, `DELETE /api/users/:id`,
+  `DELETE /api/invites/:id`, `GET /api/setup/github/info`,
+  `GET /api/setup/github/manifest`, `DELETE /api/setup/github`.
+- All run/preview endpoints are already open to every member.
+- UI gates: `app/pages/settings.vue` (lines 166, 247, 272) and
+  `app/layouts/default.vue:97` ("Owner" / "Member" label).
+
+Changes:
+- Remove the `if (!user.isOwner) throw 403` check from the 8 owner-only
+  endpoints. All logged-in users can call them.
+- Keep `isOwner` as a column (do NOT drop it in a migration). The first-user
+  marker is still needed by the setup flow: `hasOwner()`
+  (`server/utils/users.ts:35`) determines whether registration is first-run
+  (owner claim) or invite-based.
+- Update `app/layouts/default.vue:97`: drop the "Owner" / "Member"
+  distinction or replace with a generic "Admin".
+- Update `app/pages/settings.vue`: remove `v-if="isOwner"` guards on
+  GitHub/SSH/users sections (lines 166, 247, 272). All logged-in users see
+  them. Keep the per-user "delete" button visible for all users (not just
+  owner), but keep the guard that forbids self-deletions and deleting the
+  last remaining `isOwner` user.
+- `shared/types/auth.d.ts` and `server/utils/users.ts` `SessionUser`: keep
+  `isOwner` in the session (the setup flow reads it), but stop using it for
+  authorization.
+
+Security implication: any invited user can disconnect the GitHub App,
+delete other users, change SSH target, or revoke invites. Acceptable for a
+small-team preview tool (the intended use case) but a risk for larger orgs.
+The tradeoff is simplicity: no role management UI, no per-user permission
+checks. If finer control is ever needed, it can be added later without
+changing the Phase 8 visibility model.
+
+## Phase 10: Docs + run controls (planned in a separate session)
+
+- [ ] Clarify in README how VPS users can update the project (see reference
+      project `_reference-project/knecht-cloud/` for the update workflow).
+      Today the installer is one-shot; operators need documented steps for
+      pulling a new image/tag and re-running `docker compose up -d`.
+
+The following run-control features need to be planned in a separate session
+(scope, schema impact, and UI placement are not yet decided):
+
+- Better .env editor: edit the run's env vars anytime, not just on preview
+  instance launch (today `envVars` is set once at `launch.post.ts` and
+  never editable after). Needs a re-apply path that rewrites the ddev
+  overrides and restarts the environment.
+- Git pull support: a command triggered when a branch is updated, so a run
+  can pick up new commits without a full re-launch. Needs a re-run path
+  that pulls inside the existing checkout and re-runs the start command.
+- Online VS Code IDE: already implemented in the reference project
+  (`_reference-project/knecht-cloud/`, code-server in a sidecar container
+  per run). Needs the same integration here: a launcher toggle, a sidecar
+  container in docker-compose, a route through the preview proxy, and a
+  "Open in VS Code" button on the run page.
+
 ## Decisions
 
 - Service name: `quickddevpreviews` (Linux user, container, install dir)
