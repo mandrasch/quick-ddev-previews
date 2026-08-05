@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatEnvText, parseEnvText } from '../../app/utils/env'
+import { parseEnvText } from '../../app/utils/env'
 
 describe('env textbox format', () => {
   describe('parseEnvText', () => {
@@ -21,13 +21,6 @@ describe('env textbox format', () => {
       expect(parseEnvText('APP_URL=https://x.com\nnot-a-key-value')).toEqual([
         { key: 'APP_URL', value: 'https://x.com' },
       ])
-    })
-  })
-
-  describe('formatEnvText', () => {
-    it('round-trips through parseEnvText', () => {
-      const envVars = [{ key: 'A', value: '1' }, { key: 'B', value: '' }]
-      expect(parseEnvText(formatEnvText(envVars))).toEqual(envVars)
     })
   })
 })

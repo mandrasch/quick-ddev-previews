@@ -38,6 +38,16 @@ export function projectDumpDir(projectId: number): string {
   return dir
 }
 
+// Host-side tools staged once per machine and bind-mounted read-only into every
+// run's web container (daemon/ddev.ts): currently the openvscode-server web IDE
+// (daemon/ide.ts). Sits under the data dir so it follows the same-path
+// convention (data dir is mounted byte-identically host + container, see
+// docker-compose.yml), which is what lets the HOST daemon resolve the mount
+// when a run's stack boots.
+export function toolsDir(): string {
+  return join(dataDir(), 'tools')
+}
+
 // Strip anything that could escape the dump folder (path traversal, odd chars).
 export function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '') || 'dump'

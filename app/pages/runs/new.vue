@@ -253,8 +253,8 @@ async function launch() {
         <!-- TODO: use better positioning -->
         <small>Runs inside the web container after ddev start (which happens automatically)</small>
 
-        <!-- 4. .env values -->
-        <UFormField label=".env values">
+        <!-- 4. Boot environment variables -->
+        <UFormField label="Boot environment variables">
           <div class="flex flex-col gap-2">
             <div class="flex items-center justify-end">
               <UButton
@@ -276,6 +276,7 @@ async function launch() {
               block
             />
           </div>
+          <small>Injected at launch and translated to preview URLs. The project's own .env file can be edited later in the run's integrated VS Code.</small>
         </UFormField>
 
         <!-- 5. Preview access -->

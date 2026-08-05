@@ -34,6 +34,17 @@ export function isPreviewHost(host: string): boolean {
   return PREVIEW_HOST_RE.test(host)
 }
 
+// The reserved label for a run's web IDE: `<slug>.preview.<base>` serves the
+// app, `ide--<slug>.preview.<base>` serves openvscode-server (see
+// server/utils/ide-proxy.ts). A project ddev hostname whose previewLabel maps
+// to this (e.g. `ide.ddev.site`) loses the collision, which no real hostname
+// does in practice (same accepted edge as the reference project).
+export const IDE_LABEL = 'ide'
+
+export function isIdeLabel(label: string | undefined): boolean {
+  return label === IDE_LABEL
+}
+
 // The dashboard's own host, recovered from a preview host (e.g. to send a
 // logged-out visitor back to the login page). Ports survive.
 export function stripPreviewPrefix(host: string): string {

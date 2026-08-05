@@ -211,10 +211,11 @@ Residual risks to track (not addressed in this phase):
 ## Phase 5 (next): lifecycle, db dump, framework detection, run controls
 
 - [x] .env-editor which can edit the file anytime, not just on preview instance launch
-  - `PATCH /api/runs/:id/env` saves anytime; values are masked in the run GET
-    (sentinel, `server/utils/env-mask.ts`) so secrets never round-trip through
-    the UI as plaintext. A Reboot re-applies the ddev override with the new
-    values (`server/daemon/run-controls.ts`).
+  - DROPPED in favor of the web IDE: the DB-driven run-page editor never
+    reflected the checkout's real `.env` file (it edits `runs.envVars`, the
+    launch-time ddev web_environment injection), so it was misleading. The
+    run page now guides users to edit `.env` in the integrated VS Code, which
+    sees the real mounted file.
 - [x] button for git pull, if branch changes
   - `POST /api/runs/:id/pull` background job (run.pulling drives the button):
     shallow-fetch + hard-reset the checkout to the branch tip, reconcile the
@@ -231,7 +232,15 @@ Residual risks to track (not addressed in this phase):
   - Retry (re-queue for a fresh boot), Reboot (re-apply env + restart stack),
     Stop / Start (envState toggle, volumes kept), Cancel (abort in-flight). The
     `/runs` list shows envState + quick Cancel/Retry/Stop/Start actions.
-- [ ] vscode-server integration (see knecht-cloud)
+- [x] vscode-server integration (see knecht-cloud)
+  - openvscode-server runs INSIDE each run's web container (staged once per
+    host, ~120MB, `server/daemon/ide.ts`; read-only bind mount in the ddev
+    override, `server/daemon/ddev.ts`). Served at `ide--<slug>.preview.<base>`
+    via `server/utils/ide-proxy.ts` (HTTP + a WebSocket pipe wired by
+    `server/plugins/ide-ws.ts`), session/membership gated. The run page's
+    "Code" button (`POST /api/runs/:id/ide`) opens it. The `ide` label is
+    reserved (`shared/utils/preview-host.ts`); tls-ask already canonical-checks
+    the `[<label>--]<slug>` form, so `ide--` certs work unchanged.
 - [ ] Idle-stop / archive / restore lifecycle (reapIdleEnvs, retention ladder)
 - [ ] DB dump upload + import (`ddev import-db`), shared folders
 - [ ] Framework detection chips (typo3/craft/laravel) on the launcher
@@ -468,15 +477,8 @@ changing the Phase 8 visibility model.
       project `_reference-project/knecht-cloud/` for the update workflow).
       Today the installer is one-shot; operators need documented steps for
       pulling a new image/tag and re-running `docker compose up -d`.
-
-The following run-control features need to be planned in a separate session
-(scope, schema impact, and UI placement are not yet decided):
-
-- Online VS Code IDE: already implemented in the reference project
-  (`_reference-project/knecht-cloud/`, code-server in a sidecar container
-  per run). Needs the same integration here: a launcher toggle, a sidecar
-  container in docker-compose, a route through the preview proxy, and a
-  "Open in VS Code" button on the run page.
+      (The online VS Code IDE is DONE, see Phase 5: it runs inside each run's
+      web container, not as a sidecar.)
 
 ## Phase 11: Clarify install modes for home / Mac mini hosting
 

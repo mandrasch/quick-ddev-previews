@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  IDE_LABEL,
+  isIdeLabel,
   isPreviewHost,
   isValidSlug,
   parsePreviewHost,
@@ -97,6 +99,25 @@ describe('preview-host', () => {
       const host = previewHostname('myfeature', base)
       expect(host.endsWith('.sslip.io')).toBe(true)
       expect(host.endsWith('..sslip.io')).toBe(false)
+    })
+  })
+
+  describe('IDE_LABEL / isIdeLabel', () => {
+    it('parses the reserved ide--<slug> host into the IDE label', () => {
+      expect(parsePreviewHost('ide--myfeature.preview.5-78-123-4.sslip.io')).toEqual({
+        slug: 'myfeature',
+        label: 'ide',
+      })
+    })
+
+    it('reconstructs the canonical IDE host', () => {
+      expect(previewHostname('myfeature', 'previews.example.com', IDE_LABEL)).toBe('ide--myfeature.preview.previews.example.com')
+    })
+
+    it('isIdeLabel matches only the reserved label', () => {
+      expect(isIdeLabel('ide')).toBe(true)
+      expect(isIdeLabel(undefined)).toBe(false)
+      expect(isIdeLabel('knaus-kta')).toBe(false)
     })
   })
 

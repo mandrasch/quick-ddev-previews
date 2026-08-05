@@ -109,37 +109,25 @@ watch(() => run.value?.pulling, (p) => {
 
 onMounted(() => void checkPullStatus())
 
-// ── .env editor (values are masked server-side) ─────────────────────────────
-const envText = ref('')
-const envInitialized = ref(false)
-const envSaving = ref(false)
-const envSaved = ref(false)
-const envError = ref<string | null>(null)
-
-watch(run, (r) => {
-  if (!r || envInitialized.value) return
-  envText.value = formatEnvText(r.envVars ?? [])
-  envInitialized.value = true
-}, { immediate: true })
-
-async function saveEnv() {
-  envSaving.value = true
-  envError.value = null
-  envSaved.value = false
+// ── Web IDE (openvscode-server) ──────────────────────────────────────────────
+const openingVscode = ref(false)
+async function openInVscode() {
+  openingVscode.value = true
+  // Open the tab synchronously: popup blockers kill windows opened after an
+  // await. Navigate it once the server confirms the IDE is up.
+  const tab = window.open('about:blank', '_blank')
   try {
-    await $fetch(`/api/runs/${runId.value}/env`, {
-      method: 'PATCH',
-      body: { envVars: parseEnvText(envText.value) },
-    })
-    envSaved.value = true
-    await refresh()
+    const { url } = await $fetch<{ url: string }>(`/api/runs/${runId.value}/ide`, { method: 'POST' })
+    if (tab) tab.location.href = url
+    else window.open(url, '_blank')
   }
   catch (err: unknown) {
+    tab?.close()
     const e = err as { data?: { statusMessage?: string } }
-    envError.value = e?.data?.statusMessage || 'Could not save environment'
+    toast.add({ title: e?.data?.statusMessage || 'Could not open the IDE', color: 'error' })
   }
   finally {
-    envSaving.value = false
+    openingVscode.value = false
   }
 }
 
@@ -456,6 +444,17 @@ async function copySshCommand() {
             Terminal
           </UButton>
           <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            icon="i-lucide-code"
+            :disabled="!canTerminal"
+            :loading="openingVscode"
+            @click="openInVscode"
+          >
+            Code
+          </UButton>
+          <UButton
             color="error"
             variant="ghost"
             size="sm"
@@ -646,50 +645,15 @@ async function copySshCommand() {
       </section>
 
       <section class="k-card p-6">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">
-            Environment
-          </h2>
-          <UButton
-            color="primary"
-            variant="outline"
-            size="xs"
-            icon="i-lucide-save"
-            :loading="envSaving"
-            @click="saveEnv"
-          >
-            Save
-          </UButton>
-        </div>
+        <h2 class="text-lg font-semibold">
+          Environment
+        </h2>
         <p class="mt-1 text-2xs text-dimmed">
-          Values are masked for safety. Edit a value to change it, leave the mask as-is to keep it, or delete the line to remove the variable.
+          Boot-time environment variables were set at launch and are applied when the environment boots or reboots.
         </p>
-        <UTextarea
-          v-model="envText"
-          placeholder="APP_URL=https://…&#10;DB_HOST=db"
-          :rows="8"
-          class="k-mono mt-3"
-          block
-        />
-        <div class="mt-2 flex flex-col gap-2">
-          <UAlert
-            v-if="envError"
-            color="error"
-            variant="subtle"
-            :description="envError"
-          />
-          <div class="flex items-center gap-3">
-            <span
-              v-if="envSaved"
-              class="text-xs text-emerald-400"
-            >
-              Saved
-            </span>
-            <small class="text-muted">
-              Saving does not change the running environment. Reboot the environment to apply the new values.
-            </small>
-          </div>
-        </div>
+        <p class="mt-2 text-2xs text-dimmed">
+          To change the project's <span class="k-mono">.env</span> file, open the integrated VS Code and edit it there. The file is the real, mounted checkout, so changes take effect immediately for the app.
+        </p>
       </section>
     </div>
 

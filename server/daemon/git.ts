@@ -76,6 +76,9 @@ function shieldGeneratedFiles(dir: string): void {
     '/.ddev/config.quickddevpreviews.yaml',
     '/.ddev/docker-compose.quickddevpreviews.yaml',
     '/.ddev/mysql/00-quickddevpreviews-lowmem.cnf',
+    // The web IDE's state dir (daemon/ide.ts) lives under the checkout so it
+    // survives container recreates; it must never enter a commit.
+    '/.quickddevpreviews/',
   ]
   try {
     const current = existsSync(exclude) ? readFileSync(exclude, 'utf8') : ''
