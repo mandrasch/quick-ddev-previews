@@ -2,6 +2,9 @@
 
 A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS or a MacMini, connect GitHub repositories and launch quick DDEV previews of any branch - which can be shared securely with testers, clients or coworkers.
 
+> [!WARNING]
+> Experimental, use at your own risk. This project is an early preview and proof of concept - no warranties given.
+
 ## 🚧 (Experimental) fork of Knecht Cloud 🚧
 
 This is a fork of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör.  Significant changes made:
@@ -9,9 +12,7 @@ This is a fork of https://github.com/knecht-works/knecht-cloud, a project made b
 - Added a "create preview" feature, strip other features
 - Add support for `sslip.io`, so no external domain required on install
 - Registration flow changed to email/password first
-
-> [!WARNING]
-> Experimental, use at your own risk. This project is an early preview and proof of concept - no warranties given.
+- Added public / private / password sharing and custom URL slug
 
 ## Demo videos
 
