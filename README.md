@@ -93,10 +93,10 @@ Non-interactive overrides:
 
 ```bash
 # a real domain, skipping the menu
-QDP_DOMAIN=previews.example.com bash <(curl -fsSL <repo-url>/scripts/install.sh)
+QUICKDDEVPREVIEWS_DOMAIN=previews.example.com bash <(curl -fsSL <repo-url>/scripts/install.sh)
 
 # force a mode: sslip | domain | lvhme
-QDP_MODE=lvhme bash <(curl -fsSL <repo-url>/scripts/install.sh)
+QUICKDDEVPREVIEWS_MODE=lvhme bash <(curl -fsSL <repo-url>/scripts/install.sh)
 ```
 
 ## Self-host on a Mac (home server)
