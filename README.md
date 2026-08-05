@@ -109,8 +109,7 @@ Create the VM from the checked-in template, then run the installer inside it:
 ```bash
 brew install lima
 limactl create --name=quickddevpreviews https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/lima-prod.yaml
-limactl start quickddevpreviews
-limactl shell quickddevpreviews
+limactl start quickddevpreviews && limactl shell quickddevpreviews
 # inside the VM:
 curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | sudo bash
 ```
@@ -243,6 +242,15 @@ npm run dev:vm          # restart after schema or dependency changes
   VM, and the VM disk + Docker/ddev images live there (a spinning HDD is
   slower, an SSD is best). The repo itself stays on the Mac.
 - Done for the day: `limactl stop quickddevpreviews-dev`.
+
+### Reinstall the dev VM from scratch (verify recent edits)
+
+```bash
+limactl delete -f quickddevpreviews-dev
+```
+
+If you want to keep the VM and only reset the database, run `npm run db:reset`
+inside it instead; that skips the slowest parts.
 
 ### On a plain Linux host (not tested yet)
 
