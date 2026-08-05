@@ -1,6 +1,8 @@
 import { eq, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { projects, runs } from '../../db/schema'
+import { isPulling } from '../../daemon/run-controls'
+import { maskEnvVars } from '../../utils/env-mask'
 
 // GET /api/runs/:id: a single run WITH its log, for the detail page poll.
 export default defineEventHandler(async (event) => {
@@ -19,6 +21,7 @@ export default defineEventHandler(async (event) => {
     previewPasswordSet: sql<boolean>`${runs.previewPasswordHash} is not null`,
     startCommand: runs.startCommand,
     envVars: runs.envVars,
+    postPullCommands: runs.postPullCommands,
     status: runs.status,
     envState: runs.envState,
     previewReady: runs.previewReady,
@@ -35,5 +38,13 @@ export default defineEventHandler(async (event) => {
     .get()
 
   if (!run) throw createError({ statusCode: 404, statusMessage: 'Run not found' })
-  return run
+  return {
+    ...run,
+    // Values are masked (server/utils/env-mask.ts): the .env editor shows
+    // secrets as a sentinel and only new values are sent back.
+    envVars: maskEnvVars(run.envVars ?? []),
+    // A git pull is currently re-applying the branch in the background; the
+    // run page polls it to keep its "Pulling…" state and log live.
+    pulling: isPulling(id),
+  }
 })

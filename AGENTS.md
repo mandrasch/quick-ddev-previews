@@ -210,13 +210,31 @@ Residual risks to track (not addressed in this phase):
 
 ## Phase 5 (next): lifecycle, db dump, framework detection, run controls
 
-- [ ] .env-editor which can edit the file anytime, not just on preview instance launch
-- [ ] button for git pull, if branch changes
+- [x] .env-editor which can edit the file anytime, not just on preview instance launch
+  - `PATCH /api/runs/:id/env` saves anytime; values are masked in the run GET
+    (sentinel, `server/utils/env-mask.ts`) so secrets never round-trip through
+    the UI as plaintext. A Reboot re-applies the ddev override with the new
+    values (`server/daemon/run-controls.ts`).
+- [x] button for git pull, if branch changes
+  - `POST /api/runs/:id/pull` background job (run.pulling drives the button):
+    shallow-fetch + hard-reset the checkout to the branch tip, reconcile the
+    stack, re-run the start command. `GET /api/runs/:id/pull-status` powers the
+    "New commits available" hint. Retries also sync the checkout to the branch
+    tip first (`server/daemon/git.ts`).
+  - The run page's "Post-pull commands" editor (`PATCH
+    /api/runs/:id/post-pull-commands`, column `runs.post_pull_commands`,
+    migration `0005`) adds extra commands executed after a pull, in order,
+    after the start command (`server/daemon/run-controls.ts`). The "Init
+    commands" section shows the run's start command + boot state + a Retry
+    button (re-queue for a fresh boot).
+- [x] Retry / reboot / cancel buttons on the run page
+  - Retry (re-queue for a fresh boot), Reboot (re-apply env + restart stack),
+    Stop / Start (envState toggle, volumes kept), Cancel (abort in-flight). The
+    `/runs` list shows envState + quick Cancel/Retry/Stop/Start actions.
 - [ ] vscode-server integration (see knecht-cloud)
 - [ ] Idle-stop / archive / restore lifecycle (reapIdleEnvs, retention ladder)
 - [ ] DB dump upload + import (`ddev import-db`), shared folders
 - [ ] Framework detection chips (typo3/craft/laravel) on the launcher
-- [ ] Retry / reboot / cancel buttons on the run page
 
 ## Phase 6 (done, one manual step): publish the Docker image via GitHub Actions
 
@@ -454,13 +472,6 @@ changing the Phase 8 visibility model.
 The following run-control features need to be planned in a separate session
 (scope, schema impact, and UI placement are not yet decided):
 
-- Better .env editor: edit the run's env vars anytime, not just on preview
-  instance launch (today `envVars` is set once at `launch.post.ts` and
-  never editable after). Needs a re-apply path that rewrites the ddev
-  overrides and restarts the environment.
-- Git pull support: a command triggered when a branch is updated, so a run
-  can pick up new commits without a full re-launch. Needs a re-run path
-  that pulls inside the existing checkout and re-runs the start command.
 - Online VS Code IDE: already implemented in the reference project
   (`_reference-project/knecht-cloud/`, code-server in a sidecar container
   per run). Needs the same integration here: a launcher toggle, a sidecar

@@ -162,6 +162,14 @@ export const runs = sqliteTable('runs', {
     .notNull()
     .default(sql`'[]'`),
 
+  // Extra commands run AFTER a git pull (server/daemon/run-controls.ts), e.g.
+  // `npm run build` or `php bin/console cache:clear`. Executed in order in the
+  // web container, after the run's start command. JSON array of strings.
+  postPullCommands: text('post_pull_commands', { mode: 'json' })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+
   status: text('status', { enum: ['queued', 'running', 'success', 'failed', 'cancelled'] })
     .notNull()
     .default('queued'),

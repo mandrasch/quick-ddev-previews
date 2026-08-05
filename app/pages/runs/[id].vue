@@ -7,8 +7,10 @@ const toast = useToast()
 
 const { data: run, refresh } = await useFetch(`/api/runs/${runId.value}`)
 
-// Poll while the run is live.
-const live = computed(() => run.value?.status === 'queued' || run.value?.status === 'running')
+// Poll while the run is live (booting, or a git pull is re-applying the branch).
+const live = computed(() =>
+  run.value?.status === 'queued' || run.value?.status === 'running' || run.value?.pulling === true,
+)
 watch(live, (l) => {
   if (l) {
     const t = setInterval(() => void refresh(), 3000)
@@ -24,6 +26,168 @@ const canOpen = computed(() => previewOnline.value)
 const isBooting = computed(() =>
   run.value?.status === 'running' && run.value.previewReady !== true,
 )
+
+// ── Run controls (Retry / Reboot / Stop / Start / Cancel / Pull) ───────────
+const { pending: actionPending, runAction } = useRunActions(() => void refresh())
+
+const canCancel = computed(() => run.value?.status === 'queued' || run.value?.status === 'running')
+const canRetry = computed(() => !!run.value && !canCancel.value)
+const envUp = computed(() => run.value?.envState === 'up')
+const envStopped = computed(() => run.value?.envState === 'stopped')
+const canBootControls = computed(() => envUp.value || envStopped.value)
+
+function cancelRun() {
+  return runAction(runId.value, 'cancel', { success: 'Run cancelled' })
+}
+
+function retry() {
+  return runAction(runId.value, 'retry', {
+    confirm: 'Retry this preview? It boots again from the branch tip.',
+    success: 'Run queued for a fresh boot',
+  })
+}
+
+function stop() {
+  return runAction(runId.value, 'stop', {
+    confirm: 'Stop this preview environment? Containers are removed, its volumes and checkout are kept.',
+    success: 'Environment stopped',
+  })
+}
+
+function start() {
+  return runAction(runId.value, 'start', { success: 'Environment started' })
+}
+
+function reboot() {
+  return runAction(runId.value, 'reboot', {
+    confirm: 'Reboot this preview environment? It blips briefly.',
+    success: 'Environment rebooted',
+  })
+}
+
+// Git pull: re-apply the branch's latest commits. The POST returns immediately
+// and the background job streams progress to the boot log; run.pulling (polled
+// above) drives the button's loading state.
+const pullStatus = ref<'behind' | 'up-to-date' | 'unknown'>('unknown')
+const checkingPull = ref(false)
+const pullStatusText = computed(() => {
+  if (checkingPull.value) return 'Checking…'
+  if (pullStatus.value === 'behind') return 'New commits available'
+  if (pullStatus.value === 'up-to-date') return 'Up to date'
+  return ''
+})
+
+async function checkPullStatus() {
+  const r = run.value
+  if (!r || (r.envState !== 'up' && r.envState !== 'stopped')) {
+    pullStatus.value = 'unknown'
+    return
+  }
+  checkingPull.value = true
+  try {
+    const res = await $fetch<{ behind: boolean }>(`/api/runs/${runId.value}/pull-status`)
+    pullStatus.value = res.behind ? 'behind' : 'up-to-date'
+  }
+  catch {
+    pullStatus.value = 'unknown'
+  }
+  finally {
+    checkingPull.value = false
+  }
+}
+
+async function pull() {
+  await runAction(runId.value, 'pull', { success: 'Pull started' })
+  void checkPullStatus()
+}
+
+// A finished pull (pulling flips back to false) may have moved the branch:
+// refresh the hint. Initial check happens in onMounted.
+watch(() => run.value?.pulling, (p) => {
+  if (p === false) void checkPullStatus()
+})
+
+onMounted(() => void checkPullStatus())
+
+// ── .env editor (values are masked server-side) ─────────────────────────────
+const envText = ref('')
+const envInitialized = ref(false)
+const envSaving = ref(false)
+const envSaved = ref(false)
+const envError = ref<string | null>(null)
+
+watch(run, (r) => {
+  if (!r || envInitialized.value) return
+  envText.value = formatEnvText(r.envVars ?? [])
+  envInitialized.value = true
+}, { immediate: true })
+
+async function saveEnv() {
+  envSaving.value = true
+  envError.value = null
+  envSaved.value = false
+  try {
+    await $fetch(`/api/runs/${runId.value}/env`, {
+      method: 'PATCH',
+      body: { envVars: parseEnvText(envText.value) },
+    })
+    envSaved.value = true
+    await refresh()
+  }
+  catch (err: unknown) {
+    const e = err as { data?: { statusMessage?: string } }
+    envError.value = e?.data?.statusMessage || 'Could not save environment'
+  }
+  finally {
+    envSaving.value = false
+  }
+}
+
+// ── Init commands: the run's start command + its boot state + Retry ─────────
+const initStateLabel = computed(() => run.value?.status ?? 'unknown')
+const initStateBadgeColor = computed(() => {
+  switch (run.value?.status) {
+    case 'success': return 'success'
+    case 'failed': case 'cancelled': return 'error'
+    case 'running': case 'queued': return 'warning'
+    default: return 'neutral'
+  }
+})
+
+// ── Post-pull commands editor (run after a git pull) ─────────────────────────
+const postPullText = ref('')
+const postPullInitialized = ref(false)
+const postPullSaving = ref(false)
+const postPullSaved = ref(false)
+const postPullError = ref<string | null>(null)
+
+watch(run, (r) => {
+  if (!r || postPullInitialized.value) return
+  postPullText.value = (r.postPullCommands ?? []).join('\n')
+  postPullInitialized.value = true
+}, { immediate: true })
+
+async function savePostPull() {
+  postPullSaving.value = true
+  postPullError.value = null
+  postPullSaved.value = false
+  try {
+    const commands = postPullText.value.split('\n').map(c => c.trim()).filter(Boolean)
+    await $fetch(`/api/runs/${runId.value}/post-pull-commands`, {
+      method: 'PATCH',
+      body: { commands },
+    })
+    postPullSaved.value = true
+    await refresh()
+  }
+  catch (err: unknown) {
+    const e = err as { data?: { statusMessage?: string } }
+    postPullError.value = e?.data?.statusMessage || 'Could not save post-pull commands'
+  }
+  finally {
+    postPullSaving.value = false
+  }
+}
 
 // ── Share + preview access (Phase 8) ─────────────────────────────────────────
 const reqUrl = useRequestURL()
@@ -214,7 +378,72 @@ async function copySshCommand() {
             </UBadge>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <UButton
+            v-if="canCancel"
+            color="error"
+            variant="ghost"
+            size="sm"
+            icon="i-lucide-circle-x"
+            :loading="actionPending === 'cancel'"
+            @click="cancelRun"
+          >
+            Cancel
+          </UButton>
+          <UButton
+            v-if="envStopped"
+            color="primary"
+            variant="outline"
+            size="sm"
+            icon="i-lucide-play"
+            :loading="actionPending === 'start'"
+            @click="start"
+          >
+            Start
+          </UButton>
+          <UButton
+            v-if="canBootControls"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            icon="i-lucide-refresh-cw"
+            :loading="actionPending === 'reboot'"
+            @click="reboot"
+          >
+            Reboot
+          </UButton>
+          <UButton
+            v-if="envUp"
+            color="warning"
+            variant="ghost"
+            size="sm"
+            icon="i-lucide-square"
+            :loading="actionPending === 'stop'"
+            @click="stop"
+          >
+            Stop
+          </UButton>
+          <div
+            v-if="canBootControls"
+            class="flex items-center gap-2"
+          >
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="sm"
+              icon="i-lucide-git-pull-request"
+              :loading="actionPending === 'pull' || run?.pulling"
+              @click="pull"
+            >
+              Pull latest
+            </UButton>
+            <span
+              v-if="pullStatusText"
+              class="text-2xs text-dimmed"
+            >
+              {{ pullStatusText }}
+            </span>
+          </div>
           <UButton
             color="neutral"
             variant="outline"
@@ -334,27 +563,131 @@ async function copySshCommand() {
       </section>
 
       <section class="k-card p-6">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold">
+              Init commands
+            </h2>
+            <p class="mt-1 text-2xs text-dimmed">
+              Run once when the preview boots, inside the web container. Retry boots the preview again from the branch tip.
+            </p>
+          </div>
+          <div class="flex flex-none items-center gap-2">
+            <UBadge
+              :color="initStateBadgeColor"
+              variant="subtle"
+              size="sm"
+            >
+              {{ initStateLabel }}
+            </UBadge>
+            <UButton
+              v-if="canRetry"
+              color="primary"
+              variant="outline"
+              size="sm"
+              icon="i-lucide-rotate-ccw"
+              :loading="actionPending === 'retry'"
+              @click="retry"
+            >
+              Retry
+            </UButton>
+          </div>
+        </div>
+        <pre class="k-mono mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-default bg-(--surface-base) p-4 text-2xs text-dimmed">{{ run.startCommand || 'No init command set (ddev start only).' }}</pre>
+      </section>
+
+      <section class="k-card p-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">
+            Post-pull commands
+          </h2>
+          <UButton
+            color="primary"
+            variant="outline"
+            size="xs"
+            icon="i-lucide-save"
+            :loading="postPullSaving"
+            @click="savePostPull"
+          >
+            Save
+          </UButton>
+        </div>
+        <p class="mt-1 text-2xs text-dimmed">
+          Run after a git pull, inside the web container, after the init command. One command per line, executed in order.
+        </p>
+        <UTextarea
+          v-model="postPullText"
+          placeholder="npm run build&#10;php bin/console cache:clear"
+          :rows="4"
+          class="k-mono mt-3"
+          block
+        />
+        <div class="mt-2 flex flex-col gap-2">
+          <UAlert
+            v-if="postPullError"
+            color="error"
+            variant="subtle"
+            :description="postPullError"
+          />
+          <span
+            v-if="postPullSaved"
+            class="text-xs text-emerald-400"
+          >
+            Saved
+          </span>
+        </div>
+      </section>
+
+      <section class="k-card p-6">
         <h2 class="text-lg font-semibold">
           Boot log
         </h2>
         <pre class="k-mono mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-default bg-(--surface-base) p-4 text-2xs text-dimmed">{{ run.log || 'Waiting for the run to start…' }}</pre>
       </section>
 
-      <section
-        v-if="run.envVars.length"
-        class="k-card p-6"
-      >
-        <h2 class="text-lg font-semibold">
-          Environment
-        </h2>
-        <div class="mt-3 flex flex-col gap-2">
-          <div
-            v-for="v in run.envVars"
-            :key="v.key"
-            class="flex items-center justify-between rounded-lg border border-default px-4 py-2"
+      <section class="k-card p-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">
+            Environment
+          </h2>
+          <UButton
+            color="primary"
+            variant="outline"
+            size="xs"
+            icon="i-lucide-save"
+            :loading="envSaving"
+            @click="saveEnv"
           >
-            <span class="k-mono text-2xs text-toned">{{ v.key }}</span>
-            <span class="k-mono text-2xs text-dimmed">{{ v.value }}</span>
+            Save
+          </UButton>
+        </div>
+        <p class="mt-1 text-2xs text-dimmed">
+          Values are masked for safety. Edit a value to change it, leave the mask as-is to keep it, or delete the line to remove the variable.
+        </p>
+        <UTextarea
+          v-model="envText"
+          placeholder="APP_URL=https://…&#10;DB_HOST=db"
+          :rows="8"
+          class="k-mono mt-3"
+          block
+        />
+        <div class="mt-2 flex flex-col gap-2">
+          <UAlert
+            v-if="envError"
+            color="error"
+            variant="subtle"
+            :description="envError"
+          />
+          <div class="flex items-center gap-3">
+            <span
+              v-if="envSaved"
+              class="text-xs text-emerald-400"
+            >
+              Saved
+            </span>
+            <small class="text-muted">
+              Saving does not change the running environment. Reboot the environment to apply the new values.
+            </small>
           </div>
         </div>
       </section>

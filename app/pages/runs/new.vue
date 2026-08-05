@@ -132,19 +132,6 @@ async function copyEnvExample() {
   if (res.content) envText.value = res.content
 }
 
-// Parse the .env textbox into { key, value }[].
-function parseEnv(text: string): { key: string, value: string }[] {
-  return text.split('\n')
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith('#'))
-    .map((line) => {
-      const eq = line.indexOf('=')
-      if (eq === -1) return null
-      return { key: line.slice(0, eq).trim(), value: line.slice(eq + 1).trim() }
-    })
-    .filter((x): x is { key: string, value: string } => x !== null)
-}
-
 async function launch() {
   launchError.value = null
   if (!repo.value) {
@@ -178,7 +165,7 @@ async function launch() {
         repo: repo.value,
         branch: branch.value,
         startCommand: startCommand.value.trim(),
-        envVars: parseEnv(envText.value),
+        envVars: parseEnvText(envText.value),
         slug: finalSlug,
         visibility: visibility.value,
         previewPassword: visibility.value === 'password' ? previewPassword.value : undefined,
