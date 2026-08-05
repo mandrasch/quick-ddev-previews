@@ -75,7 +75,8 @@ export async function startRun(runId: number, project: Project): Promise<void> {
 
     // 2. Write the per-run ddev overrides.
     const envVars = await getRunEnvVars(runId)
-    writeDdevConfig(checkoutDir, envVars, runId)
+    const slug = await getRunSlug(runId)
+    writeDdevConfig(checkoutDir, envVars, runId, slug)
 
     // 3. Start ddev on the host daemon. This is where the containers boot.
     //    The ingress network must exist first: the run's compose override
@@ -199,6 +200,13 @@ async function getRunBranch(runId: number, project: Project): Promise<string> {
 async function getRunEnvVars(runId: number): Promise<EnvVar[]> {
   const row = db.select().from(runs).where(eq(runs.id, runId)).get()
   return (row?.envVars as EnvVar[]) || []
+}
+
+// Every run carries a slug (the launch endpoint requires it); the fallback
+// only covers legacy rows and mirrors the migration's backfill format.
+async function getRunSlug(runId: number): Promise<string> {
+  const row = db.select().from(runs).where(eq(runs.id, runId)).get()
+  return row?.slug ?? `run-${runId}`
 }
 
 async function getRunStartCommand(runId: number): Promise<string | null> {

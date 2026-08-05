@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { projects, runs } from '../../db/schema'
 
@@ -14,6 +14,9 @@ export default defineEventHandler(async (event) => {
     owner: projects.owner,
     name: projects.name,
     branch: runs.branch,
+    slug: runs.slug,
+    visibility: runs.visibility,
+    previewPasswordSet: sql<boolean>`${runs.previewPasswordHash} is not null`,
     startCommand: runs.startCommand,
     envVars: runs.envVars,
     status: runs.status,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Recent preview runs, newest first. Polls while any run is live.
 const { data, refresh } = await useFetch('/api/runs')
+const reqUrl = useRequestURL()
 
 const hasLive = computed(() => (data.value ?? []).some(r => r.status === 'queued' || r.status === 'running'))
 watch(hasLive, (live) => {
@@ -9,6 +10,11 @@ watch(hasLive, (live) => {
     onUnmounted(() => clearInterval(t))
   }
 }, { immediate: true })
+
+// The full, shareable preview URL for a run (the slug is its host key).
+function previewUrl(run: { id: number, slug: string | null }): string {
+  return `${reqUrl.protocol}//${previewHostname(previewKey(run), reqUrl.host)}/`
+}
 
 function statusColor(status: string) {
   switch (status) {
@@ -76,12 +82,19 @@ function statusColor(status: string) {
               class="size-2 flex-none rounded-full"
               :style="{ background: statusColor(run.status) }"
             />
-            <div>
-              <div class="font-mono text-sm text-toned">
-                {{ run.fullName }}
+            <div class="min-w-0">
+              <div class="k-mono truncate text-sm text-highlighted">
+                {{ previewUrl(run) }}
               </div>
-              <div class="text-2xs text-dimmed">
-                {{ run.branch }} · #{{ run.id }}
+              <div class="mt-0.5 flex items-center gap-1.5 text-2xs text-dimmed">
+                <UIcon
+                  name="i-simple-icons-github"
+                  class="size-3 flex-none text-muted"
+                />
+                <span class="truncate font-medium text-toned">
+                  {{ run.fullName }}
+                </span>
+                <span class="flex-none">{{ run.branch }} · #{{ run.id }}</span>
               </div>
             </div>
           </div>
@@ -92,6 +105,14 @@ function statusColor(status: string) {
             >
               preview live
             </span>
+            <UBadge
+              v-if="run.visibility !== 'private'"
+              :color="run.visibility === 'public' ? 'success' : 'warning'"
+              variant="subtle"
+              size="sm"
+            >
+              {{ run.visibility }}
+            </UBadge>
             <span class="k-mono text-2xs uppercase tracking-wider text-dimmed">
               {{ run.status }}
             </span>

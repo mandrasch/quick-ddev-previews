@@ -51,8 +51,17 @@ else
 fi
 
 # ── 3. Projects dir + docker group ────────────────────────────────────────────
+# The projects dir holds each run's checkout (written by the app at boot). The
+# owner depends on who runs the app: on a VPS the app container runs as uid
+# 1000 (install.sh reserves it for the service user); in the dev VM the
+# invoking user drives the app directly, so the dir must be theirs.
+if [ "$(id -u)" = 0 ]; then
+  DIR_OWNER="1000:1000"
+else
+  DIR_OWNER="$(id -u):$(id -g)"
+fi
 sudo mkdir -p "$PROJECTS_DIR"
-sudo chown 1000:1000 "$PROJECTS_DIR"
+sudo chown "$DIR_OWNER" "$PROJECTS_DIR"
 if id -u "$SERVICE_USER" >/dev/null 2>&1 && ! id -nG "$SERVICE_USER" | grep -qw docker; then
   say "Adding $SERVICE_USER to the docker group"
   sudo usermod -aG docker "$SERVICE_USER"
@@ -73,6 +82,17 @@ if [ "$(id -u)" = 0 ]; then
   as_warm_user() { runuser -u "$WARM_USER" -- env -u XDG_CONFIG_HOME HOME="$(getent passwd "$WARM_USER" | cut -d: -f6)" DDEV_NONINTERACTIVE=true "$@"; }
 else
   WARM_USER="$(id -un)"
+  # Dev-VM path: the invoking user drives Docker and ddev directly, so add
+  # them to the docker group here (install.sh's root path adds the service
+  # user instead). `sg docker` below makes the just-added membership work
+  # without re-login.
+  if ! id -nG "$WARM_USER" | grep -qw docker; then
+    say "Adding $WARM_USER to the docker group"
+    sudo usermod -aG docker "$WARM_USER"
+    # Lima's guest agent caches group membership per VM boot; sessions only
+    # pick the group up after a restart. Remember this for the closing hint.
+    WARMUP_REBOOT_HINT=1
+  fi
   # `sg docker` so a just-added group membership works without re-login.
   as_warm_user() { sg docker -c "DDEV_NONINTERACTIVE=true $*" 2>/dev/null || env DDEV_NONINTERACTIVE=true "$@"; }
 fi
@@ -93,17 +113,32 @@ fi
 # etc.), whose first-time setup is NOT safe under parallel project starts.
 say "Warming the ddev image cache (throwaway project)"
 WARMUP="$(mktemp -d)"
+# A per-run project name: ddev registers project names globally, so a fixed
+# name left behind by a failed or interrupted run makes the next `ddev config`
+# refuse. The trap removes the project on ANY exit, so a half-warm run cannot
+# poison the next one even if the shell dies mid-way.
+WARMUP_NAME="quickddevpreviews-warmup-$$"
 mkdir -p "$WARMUP/public"
 echo '<?php echo "quickddevpreviews-warmup";' > "$WARMUP/public/index.php"
 chown -R "$WARM_USER" "$WARMUP" 2>/dev/null || true
+
+cleanup_warmup() {
+  as_warm_user ddev delete --omit-snapshot -y "$WARMUP_NAME" >/dev/null 2>&1 || true
+  rm -rf "$WARMUP"
+}
+trap cleanup_warmup EXIT
+
 (
   cd "$WARMUP"
-  as_warm_user ddev config --project-type=php --docroot=public --project-name=quickddevpreviews-warmup
+  as_warm_user ddev config --project-type=php --docroot=public --project-name="$WARMUP_NAME"
   as_warm_user ddev start -y
-  as_warm_user ddev delete --omit-snapshot -y quickddevpreviews-warmup
 )
-rm -rf "$WARMUP"
 
 echo "✓ Host provisioned. Sanity check:"
 sudo docker info --format '  docker {{.ServerVersion}}'
 as_warm_user ddev --version | sed 's/^/  /'
+
+if [ "${WARMUP_REBOOT_HINT:-}" = "1" ]; then
+  echo "⚠ New sessions don't see the docker group until the VM is restarted:"
+  echo "  limactl restart $(hostname 2>/dev/null || echo '<instance>')"
+fi

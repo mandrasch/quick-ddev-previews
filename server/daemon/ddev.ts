@@ -31,12 +31,14 @@ const INGRESS_NETWORK = 'quickddevpreviews-ingress'
 //   - compose override: the web container joins the ingress network, gets
 //     memory/pids caps, the db gets a memory cap.
 // The project's own hostnames stay exactly as the repo ships them; the proxy
-// maps the project's own hostnames to per-run preview origins instead.
+// maps the project's own hostnames to per-run preview origins instead. The
+// run's slug (Phase 8) is the host key: every run has one, and the translated
+// origins use it, so the app's own links point at the human-readable URL.
 // Returns how many env vars were written.
-export function writeDdevConfig(checkoutDir: string, envVars: EnvVar[], runId: number): number {
+export function writeDdevConfig(checkoutDir: string, envVars: EnvVar[], runId: number, slug: string): number {
   const doc: { name: string, web_environment?: string[] } = { name: runSandboxName(runId) }
   if (envVars.length) {
-    const translate = envUrlTranslator(readDdevHosts(checkoutDir), runId)
+    const translate = envUrlTranslator(readDdevHosts(checkoutDir), slug)
     doc.web_environment = envVars.map(e => `${e.key}=${translate(unquote(e.value))}`)
   }
   // The marker comment silences ddev's "custom configuration detected" warning.
@@ -90,7 +92,7 @@ function composeOverride(): Record<string, unknown> {
 // origin); a remaining bare host becomes the bare preview hostname. Longest
 // host first, so a host containing another as a suffix is never
 // half-translated.
-function envUrlTranslator(hosts: DdevHosts, runId: number): (value: string) => string {
+function envUrlTranslator(hosts: DdevHosts, slug: string): (value: string) => string {
   const base = dashboardOrigin()
   if (!base || !hosts.all.length) return v => v
   const origin = new URL(base)
@@ -100,8 +102,8 @@ function envUrlTranslator(hosts: DdevHosts, runId: number): (value: string) => s
       const label = host === hosts.primary ? undefined : previewLabel(host)
       return {
         host,
-        previewOrigin: `${origin.protocol}//${previewHostname(runId, origin.host, label)}`,
-        previewBare: previewHostname(runId, origin.hostname, label),
+        previewOrigin: `${origin.protocol}//${previewHostname(slug, origin.host, label)}`,
+        previewBare: previewHostname(slug, origin.hostname, label),
       }
     })
   return (value: string) => {

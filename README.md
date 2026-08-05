@@ -169,7 +169,7 @@ QUICKDDEVPREVIEWS_BASE_URL=http://lvh.me:3333
 ```
 
 - `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` scopes the login cookie to `lvh.me`
-  so the preview subdomains (`<runId>.preview.lvh.me`) share it with the
+  so the preview subdomains (`<slug>.preview.lvh.me`) share it with the
   dashboard.
 - `QUICKDDEVPREVIEWS_BASE_URL` is the full origin for server-side links
   (invites, GitHub App callbacks); point it at the dev VM's reachable origin.
@@ -191,6 +191,12 @@ limactl shell quickddevpreviews-dev -- ./scripts/provision-host.sh
 ddev-router (it would collide with the preview proxy), and warms the shared
 image cache.
 
+> [!NOTE]
+> On the first provision the script adds your user to the `docker` group, but
+> Lima's guest agent only refreshes group membership at boot. Restart the VM
+> once before running the dev server so Docker is reachable:
+> `limactl restart quickddevpreviews-dev`.
+
 Start the dev server inside the VM (edit on the Mac as usual; the repo is
 mounted into the VM at the identical path):
 
@@ -202,7 +208,7 @@ Lima auto-forwards the dev server port to the Mac: with
 `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` set, the UI is at
 `http://lvh.me:3333` (not `localhost:3333`: the session cookie is scoped to
 `lvh.me`, so a `localhost` page never holds the login) and previews at
-`http://<runId>.preview.lvh.me:3333`. If `lvh.me` doesn't resolve, see the DNS
+`http://<slug>.preview.lvh.me:3333`. If `lvh.me` doesn't resolve, see the DNS
 note in the [Mac section](#self-host-on-a-mac-home-server) above.
 
 > [!NOTE]
@@ -226,7 +232,7 @@ npm run dev:vm          # restart after schema or dependency changes
 - New migrations under `server/db/migrations` auto-apply when the dev server
   (re)starts (`server/plugins/migrate.ts`). Regenerate one after editing the
   schema with `npm run db:generate`; wipe the dev DB with `npm run db:reset`.
-- Previews are at `http://<runId>.preview.lvh.me:3333`.
+- Previews are at `http://<slug>.preview.lvh.me:3333`.
 - Low on internal disk? Put the VM state on an external drive: set
   `export LIMA_HOME=/Volumes/<HDD>/lima` in `~/.zshrc` **before** creating the
   VM, and the VM disk + Docker/ddev images live there (a spinning HDD is
@@ -262,7 +268,7 @@ npm run dev
 ```
 
 For DDEV previews set `QUICKDDEVPREVIEWS_BASE_DOMAIN=lvh.me` in `.env` so the
-per-run preview subdomains (`<runId>.preview.lvh.me`) share the session cookie
+per-run preview subdomains (`<slug>.preview.lvh.me`) share the session cookie
 with the dashboard. Previews need a Linux host with Docker + the ddev CLI
 (`scripts/provision-host.sh` installs both; the app image ships ddev too).
 

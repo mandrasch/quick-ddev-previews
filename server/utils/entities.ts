@@ -19,6 +19,10 @@ export function getRun(id: number): Run | undefined {
   return db.select().from(runs).where(eq(runs.id, id)).get()
 }
 
+export function getRunBySlug(slug: string): Run | undefined {
+  return db.select().from(runs).where(eq(runs.slug, slug)).get()
+}
+
 export function requireRun(id: number): Run {
   const row = getRun(id)
   if (!row) throw createError({ statusCode: 404, statusMessage: 'Run not found' })
