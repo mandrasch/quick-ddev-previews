@@ -5,11 +5,11 @@
 # server:
 #
 #   brew install lima
-#   limactl create --name=quickddevpreviews https://raw.githubusercontent.com/quickddevpreviews/quickddevpreviews/main/scripts/lima-server.yaml
+#   limactl create --name=quickddevpreviews https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/lima-prod.yaml
 #   limactl start quickddevpreviews
 #   limactl shell quickddevpreviews
 #   # inside the VM:
-#   curl -fsSL https://raw.githubusercontent.com/quickddevpreviews/quickddevpreviews/main/scripts/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | sudo bash
 #
 # After a macOS reboot: limactl start quickddevpreviews (the containers inside
 # restart on their own).
