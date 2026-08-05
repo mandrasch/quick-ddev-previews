@@ -106,10 +106,13 @@ const userMenu: DropdownMenuItem[][] = [
       </div>
     </aside>
 
-    <main class="relative z-10 min-w-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-      <div class="mx-auto max-w-480 px-8 py-7">
-        <slot />
+    <main class="relative z-10 flex min-w-0 flex-1 flex-col">
+      <div class="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+        <div class="mx-auto max-w-480 px-8 py-7">
+          <slot />
+        </div>
       </div>
+      <KFooter />
     </main>
   </div>
 </template>
