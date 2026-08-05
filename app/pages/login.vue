@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 definePageMeta({ layout: 'auth' })
 
+const { fetch: refreshSession } = useUserSession()
 const route = useRoute()
 
 // An unconfigured instance has nothing to sign in to, so land visitors on the
@@ -39,6 +40,9 @@ async function onSubmit() {
       method: 'POST',
       body: { email: state.email, password: state.password },
     })
+    // The POST only sets the session cookie; re-pull the client session state
+    // so the global auth guard sees the login before we navigate away.
+    await refreshSession()
     await navigateTo('/')
   }
   catch (err: unknown) {
