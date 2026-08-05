@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 definePageMeta({ layout: 'auth' })
 
+const { fetch: refreshSession } = useUserSession()
 const route = useRoute()
 
 // Client-only: the fetch needs real HTTP cookies.
@@ -65,6 +66,9 @@ async function onSubmit() {
         invite: route.query.invite || undefined,
       },
     })
+    // The POST only sets the session cookie; re-pull the client session state
+    // so the global auth guard sees the login before we navigate away.
+    await refreshSession()
     await navigateTo('/')
   }
   catch (err: unknown) {
