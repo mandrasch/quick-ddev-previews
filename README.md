@@ -60,7 +60,7 @@ The installer asks how the instance should be reached:
 
 | Mode | When to use | Example: how the instance is reached |
 |---|---|---|
-| **1. sslip.io auto-domain** (default) | VPS with a public IP; zero DNS | `123-456-789.sslip.io` |
+| **1. sslip.io auto-domain** (default) | VPS with an (auto-retrieved) public IP; zero DNS | `123-456-789.sslip.io` |
 | **2. Real domain** | you own a domain and can point DNS records at the box | `previews.example.com` |
 | **3. lvh.me** | local previews on a Mac/Lima VM; internal TLS | `lvh.me` |
 
@@ -86,7 +86,7 @@ The installer asks how the instance should be reached:
 
 | Mode | When to use | Example: how the instance is reached |
 |---|---|---|
-| **1. sslip.io auto-domain** (default) | VPS with a public IP; zero DNS | `123-456-789.sslip.io` |
+| **1. sslip.io auto-domain** (default) | VPS with an (auto-retrieved) public IP; zero DNS | `123-456-789.sslip.io` |
 | **2. Real domain** | you own a domain and can point DNS records at the box | `previews.example.com` |
 | **3. lvh.me** | local previews on a Mac/Lima VM; internal TLS | `lvh.me` |
 
