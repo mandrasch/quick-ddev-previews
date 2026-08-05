@@ -4,9 +4,7 @@ A self-hosted service for generating DDEV preview environments. Install it on a 
 
 ## 🚧 (Experimental) fork of Knecht Cloud 🚧
 
-This is a fork of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör. 
-
-Significant changes made:
+This is a fork of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör.  Significant changes made:
 
 - Added a "create preview" feature, strip other features
 - Add support for `sslip.io`, so no external domain required on install
@@ -43,68 +41,39 @@ There are two ways to run quickddevpreviews:
 
 | I want to... | Go to | Summary |
 |---|---|---|
-| Run the service on a VPS | [Install on a VPS](#install-on-a-vps-production) | one-liner installer, mode 1/2 |
-| Run the service on a Mac at home | [Self-host on a Mac](#self-host-on-a-mac-home-server) | Lima VM + installer, mode 3 (local) or 1/2 (public) |
-| Develop / test new features | [Develop locally](#develop-locally-build-new-features) | Lima dev VM, source with HMR |
+| 1. Selfhost on a VPS | [Install on a VPS](#install-on-a-vps-production) | one-liner installer |
+| 2. Selfhost on a Mac (home server) | [Self-host on a Mac](#self-host-on-a-mac-home-server) | Lima VM + installer |
+| 3. Develop / test new features | [Develop locally](#develop-locally-build-new-features) | Lima dev VM, source with HMR |
 
-### Lima templates at a glance
-
-Both templates create an Ubuntu VM on macOS (the run substrate is Linux-only), but for different purposes:
-
-- `scripts/lima-prod.yaml` (VM `quickddevpreviews`): a production host. You run `install.sh` inside it, exactly like on a VPS. Nothing is shared with the Mac.
-- `scripts/lima-dev.yaml` (VM `quickddevpreviews-dev`): a development VM. Your repo checkout is shared read/write into it and the Nuxt dev server runs inside. The installer is not used.
-
-## Install on a VPS (production)
+## 1. Install on a VPS (production)
 
 On a fresh Ubuntu 24.04 server, e.g. a Hetzner Cloud VPS CX23, (as root):
+
+> [!WARNING]
+> Experimental, use at your own risk. Under active development / early proof of concept. No warranties given.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | bash
 ```
 
-> [!WARNING]
-> Experimental, use at your own risk. Under active development / early proof of concept. No warranties given.
-
 The installer asks how the instance should be reached:
 
-```
-How do you want to reach this instance?
-  1) sslip.io auto-domain (zero DNS; recommended for a VPS) [default]
-  2) A real domain you own (e.g. previews.example.com) - not tested yet
-  3) lvh.me (local previews on a Mac/Lima VM; internal TLS)
-```
+| Mode | When to use | Example: how the instance is reached |
+|---|---|---|
+| **1. sslip.io auto-domain** (default) | VPS with a public IP; zero DNS | `123-456-789.sslip.io` |
+| **2. Real domain** | you own a domain and can point DNS records at the box | `previews.example.com` |
+| **3. lvh.me** | local previews on a Mac/Lima VM; internal TLS | `lvh.me` |
 
-- **1** derives `<dashed-ip>.sslip.io` from the server's public IP via
-  [sslip.io](https://sslip.io), so no DNS setup is needed. Best for a VPS.
-- **2** prompts for your domain; you point DNS records at the box.
-- **3** uses `lvh.me` with Caddy's internal CA: all preview subdomains resolve
-  to 127.0.0.1, so the whole thing works on one machine with no public access.
-  This mode is for the local Mac case below, not a VPS: on a VPS pick **1** or **2**.
+Use option 1, or option 2 if you want to connect a real domain. Option 3 is not possible.
 
-It installs Docker, clones the repo, writes `.env`, and starts the app with
-Caddy TLS.
+Video: [PoC: Quick DDEV previews - on a hetzner VPS](https://www.youtube.com/watch?v=FRNQ9RinErQ) - youtube.com.
 
-> **Image builds from source for now.** No release image is published yet, so
-> the installer builds the app image on the server from the cloned checkout
-> (`docker compose up -d --build`). A published image (via a GitHub Actions
-> release pipeline) is planned for later; see AGENTS.md.
-
-Non-interactive overrides:
-
-```bash
-# a real domain, skipping the menu
-QUICKDDEVPREVIEWS_DOMAIN=previews.example.com bash <(curl -fsSL <repo-url>/scripts/install.sh)
-
-# force a mode: sslip | domain | lvhme
-QUICKDDEVPREVIEWS_MODE=lvhme bash <(curl -fsSL <repo-url>/scripts/install.sh)
-```
-
-## Self-host on a Mac (home server)
+## 2. Self-host on a Mac (home server)
 
 The run substrate (host Docker + ddev) is Linux-only, so on a Mac the same
 setup runs inside a [Lima](https://lima-vm.io) VM. 
 
-Create the VM from the checked-in template, then run the installer inside it:
+Create the VM from the prepared lima template, then run the installer inside it:
 
 ```bash
 brew install lima
@@ -113,12 +82,15 @@ limactl start quickddevpreviews && limactl shell quickddevpreviews
 # inside the VM:
 curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | sudo bash
 ```
+The installer asks how the instance should be reached:
 
-When the installer asks, choose **3) lvh.me** for local-only previews. lvh.me
-resolves to 127.0.0.1, so the dashboard and all preview subdomains reach this
-one machine without opening any router ports. The installer swaps in
-`Caddyfile.lvhme` (internal CA); accept the certificate warning once in the
-browser.
+| Mode | When to use | Example: how the instance is reached |
+|---|---|---|
+| **1. sslip.io auto-domain** (default) | VPS with a public IP; zero DNS | `123-456-789.sslip.io` |
+| **2. Real domain** | you own a domain and can point DNS records at the box | `previews.example.com` |
+| **3. lvh.me** | local previews on a Mac/Lima VM; internal TLS | `lvh.me` |
+
+If you want a quick local preview only, choose option 3. `lvh.me` simply resolve to 127.0.0.1.
 
 > [!NOTE]
 > The Mac must resolve `lvh.me` to 127.0.0.1. If it doesn't (some routers'
@@ -126,7 +98,7 @@ browser.
 > Mac's upstream DNS to Google (8.8.8.8) or Cloudflare (1.1.1.1), or add a
 > rebind exception for `lvh.me`.
 
-If instead you want the Mac mini publicly reachable, choose mode **1** or **2**
+If instead you want the service publicly reachable, choose mode **1** or **2**
 and add the home-network pieces:
 
 1. Forward TCP ports 80 and 443 on your router to the Mac.
@@ -138,23 +110,6 @@ After a macOS reboot, run `limactl start quickddevpreviews`; the containers
 inside come back up on their own. Updating and backups work exactly as below,
 with `/opt/quickddevpreviews` and `/data/quickddevpreviews` living inside the
 VM (`limactl shell quickddevpreviews`).
-
-### Switching an existing instance to lvh.me
-
-If the instance was installed in another mode, move it to local previews by
-re-running the installer with a clean `.env` (the data in `/data/…` is
-untouched):
-
-```bash
-limactl shell quickddevpreviews
-# inside the VM:
-rm /opt/quickddevpreviews/.env
-curl -fsSL https://raw.githubusercontent.com/mandrasch/quick-ddev-previews/main/scripts/install.sh | sudo bash
-# choose 3) lvh.me
-```
-
-> [!NOTE]
-> GitHub webhooks cannot reach a local instance, so GitHub triggers won't work.
 
 ## Develop locally (build new features)
 
@@ -251,6 +206,14 @@ limactl delete -f quickddevpreviews-dev
 
 If you want to keep the VM and only reset the database, run `npm run db:reset`
 inside it instead; that skips the slowest parts.
+
+### Lima templates at a glance
+
+Both templates create an Ubuntu VM on macOS (the run substrate is Linux-only), but for different purposes:
+
+- `scripts/lima-prod.yaml` (VM `quickddevpreviews`): a production host. You run `install.sh` inside it, exactly like on a VPS. Nothing is shared with the Mac.
+- `scripts/lima-dev.yaml` (VM `quickddevpreviews-dev`): a development VM. Your repo checkout is shared read/write into it and the Nuxt dev server runs inside. The installer is not used.
+
 
 ### On a plain Linux host (not tested yet)
 

@@ -465,6 +465,46 @@ The following run-control features need to be planned in a separate session
   container in docker-compose, a route through the preview proxy, and a
   "Open in VS Code" button on the run page.
 
+## Phase 11: Clarify install modes for home / Mac mini hosting
+
+Research finding (from the Mac mini question): the three install modes target
+different network situations, and the README/installer copy under-sells the
+differences for home servers.
+
+- sslip.io derives `<dashed-ip>.sslip.io` from the server's PUBLIC IP
+  (scripts/install.sh:181), so it only works when that IP is static and ports
+  80/443 are reachable. Perfect for a VPS; on a home DSL connection it breaks
+  the day the ISP rotates the IP (the domain is baked into .env at install
+  time, scripts/install.sh:196-197).
+- The Mac's LAN IP (192.168.x.x) cannot be used with sslip.io + Let's Encrypt:
+  cert issuance fails for private-IP-resolving domains. That is why mode 3
+  (lvh.me) exists: 127.0.0.1 + Caddy's internal CA.
+- A Mac mini with a STATIC public DSL IP and router port-forwarding is already
+  fully covered by mode 1: lima-prod.yaml:33-37 forwards guest 80/443 to
+  0.0.0.0 on the Mac, so the router's forward reaches the Lima VM, and Let's
+  Encrypt validates because the domain resolves publicly. No new mode needed.
+- The only real gap is CGNAT / no public IP: today there is no tunnel path
+  (Cloudflare Tunnel / Tailscale). Out of scope unless explicitly requested.
+
+Tasks:
+
+- [ ] Rewrite the "How do you want to reach this instance?" copy in
+      scripts/install.sh (lines 143-159) so each mode states its network
+      requirement up front (e.g. "static public IP + open ports 80/443").
+      Note that mode 1 needs no IP input: the installer auto-derives the
+      domain from the public IP via ifconfig.me (scripts/install.sh:181);
+      only a failed detection falls back to the
+      `QUICKDDEVPREVIEWS_DOMAIN` manual override (scripts/install.sh:187).
+- [ ] Update README "Self-host on a Mac (home server)" (README.md:110-148):
+      document that a static DSL IP uses mode 1 (sslip.io) with just the port
+      forward, a dynamic IP uses mode 2 + dynamic DNS, and local-only uses
+      mode 3.
+- [ ] Add a decision row to the `## Decisions` section noting that home-server
+      hosting needs no fourth mode, and that CGNAT/tunnel setups are
+      explicitly unsupported.
+- [ ] Optional: installer non-interactive flag to pre-select the mode in the
+      lima-prod.yaml one-liner (documented, not required).
+
 ## Decisions
 
 - Service name: `quickddevpreviews` (Linux user, container, install dir)
