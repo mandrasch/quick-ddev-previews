@@ -42,7 +42,7 @@ export QUICKDDEVPREVIEWS_DEV_POLLING=1
 
 # Off the common 3000 so quickddevpreviews dev never blocks other projects on
 # the Mac (Lima forwards it as-is: UI http://lvh.me:3333, previews
-# http://<runId>.preview.lvh.me:3333. With QUICKDDEVPREVIEWS_BASE_DOMAIN set the
+# http://<slug>.preview.lvh.me:3333. With QUICKDDEVPREVIEWS_BASE_DOMAIN set the
 # session cookie is scoped to the base domain, so reach the dashboard through
 # lvh.me, not localhost). Override with QUICKDDEVPREVIEWS_DEV_PORT.
 export PORT="${QUICKDDEVPREVIEWS_DEV_PORT:-3333}"

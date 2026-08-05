@@ -12,6 +12,8 @@ export default defineEventHandler(async () => {
     owner: projects.owner,
     name: projects.name,
     branch: runs.branch,
+    slug: runs.slug,
+    visibility: runs.visibility,
     status: runs.status,
     envState: runs.envState,
     previewReady: runs.previewReady,

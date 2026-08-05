@@ -3,7 +3,7 @@
 #
 #   1. Serve the dashboard at https://<QUICKDDEVPREVIEWS_BASE_DOMAIN> with a
 #      normally managed certificate.
-#   2. Serve the per-run preview hosts ([<label>--]<runId>.preview.<base>) with
+#   2. Serve the per-run preview hosts ([<label>--]<slug>.preview.<base>) with
 #      on-demand certificates: those hostnames only exist once a run does, so
 #      each one gets its certificate on first request. quickddevpreviews's
 #      /tls-ask endpoint (server/routes/tls-ask.get.ts) decides which hostnames

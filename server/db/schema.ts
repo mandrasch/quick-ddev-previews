@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // The registered users of this instance. First-run setup creates the owner
 // (the row with isOwner = true); afterwards the owner can invite more via the
@@ -121,6 +121,35 @@ export const runs = sqliteTable('runs', {
 
   // The branch the run checked out.
   branch: text('branch').notNull(),
+
+  // The run's preview subdomain: every run has one, the preview lives at
+  // `<slug>.preview.<base>`. The launcher always assigns a random slug (the
+  // owner can pick a custom one); there is no numeric form. Slug rules
+  // (shared/utils/preview-host.ts): `[a-z]` start, `[a-z0-9-]` body, 1-63
+  // chars, no leading/trailing hyphen, no `--` (the `--` would collide with
+  // the `<label>--<key>` separator). Nullable only because SQLite can't ALTER
+  // a column to NOT NULL; the migration backfills legacy rows and every new
+  // run carries one. Uniqueness comes from a separate unique INDEX
+  // (runs_slug_unique), not a column constraint: SQLite can't ALTER TABLE ADD
+  // a UNIQUE column, and the index form migrates as CREATE UNIQUE INDEX with
+  // no table rebuild.
+  slug: text('slug'),
+
+  // Who may view the preview. 'private' (default) = any logged-in admin, same
+  // as Phase 3. 'password' = the run's preview password (previewPasswordHash)
+  // or an admin session. 'public' = anyone with the URL, no gate at all.
+  visibility: text('visibility', { enum: ['private', 'password', 'public'] })
+    .notNull()
+    .default('private'),
+
+  // scrypt hash of the preview password (server/utils/passwords.ts), present
+  // only when visibility = 'password'. Null otherwise.
+  previewPasswordHash: text('preview_password_hash'),
+
+  // Bumped every time the preview password changes: existing qdp-preview-pw
+  // cookies embed the version and fail verification after a change, which
+  // instantly revokes them.
+  previewPasswordVersion: integer('preview_password_version').notNull().default(0),
   // The custom start command (usually: `ddev composer install` etc.).
   // Default is `ddev start` alone if the form leaves it blank.
   startCommand: text('start_command'),
@@ -167,6 +196,7 @@ export const runs = sqliteTable('runs', {
 }, table => [
   index('runs_project_id_idx').on(table.projectId),
   index('runs_status_idx').on(table.status),
+  uniqueIndex('runs_slug_unique').on(table.slug),
 ])
 
 export type Run = typeof runs.$inferSelect

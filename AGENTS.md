@@ -43,7 +43,7 @@ Non-interactive: `QUICKDDEVPREVIEWS_DOMAIN=<domain>` forces mode 2;
 `QUICKDDEVPREVIEWS_MODE=sslip|domain|lvhme` forces any; no TTY (CI) defaults to
 sslip. The session cookie must be
 scoped to the base domain (`NUXT_SESSION_COOKIE_DOMAIN`) so the per-run
-preview subdomains (`<runId>.preview.<base>`) share it with the dashboard.
+preview subdomains (`<slug>.preview.<base>`) share it with the dashboard.
 
 DNS note: if a 127.0.0.1-resolving domain like lvh.me doesn't resolve (e.g.
 some FritzBox routers block rebinding answers), set the Mac's upstream DNS to
@@ -127,7 +127,7 @@ the installer writes `<dashed-ip>.sslip.io` as `QUICKDDEVPREVIEWS_BASE_DOMAIN`
 (scripts/install.sh:197); nuxt.config.ts:30 reads the latter with a fallback
 to the former. h3 writes that as the `Domain=` attribute of the sealed
 `nuxt-session` cookie, which RFC 6265 suffix-matches every subdomain of
-`<dashed-ip>.sslip.io`, including `<runId>.preview.<dashed-ip>.sslip.io`. So
+`<dashed-ip>.sslip.io`, including `<slug>.preview.<dashed-ip>.sslip.io`. So
 the dashboard login carries over to previews (server/utils/preview-proxy.ts:54
 gates previews on the same cookie). The per-instance scope is also the only
 viable choice: `sslip.io` is on the Public Suffix List, so a `Domain=.sslip.io`
@@ -185,7 +185,7 @@ Authenticated surfaces:
 Public surfaces:
 - `/tls-ask` is intentionally unauthenticated (Caddy calls it pre-session).
   Protected by run-existence + canonical suffix-equality
-  (server/routes/tls-ask.get.ts:19-21): only `<runId>.preview.<THIS base>`
+  (server/routes/tls-ask.get.ts:19-21): only `<slug>.preview.<THIS base>`
   for an existing run qualifies.
 
 Secrets:
@@ -259,54 +259,56 @@ Two related changes that together answer the Phase 7 question "how do testers
 access previews": custom human-readable subdomains and per-run visibility
 modes (private default, password-protected, public).
 
-### Custom subdomains (Option A: `<slug>.preview.<base>`)
+### Custom subdomains (`<slug>.preview.<base>`)
 
-Today every preview is at `<runId>.preview.<base>`. The runId is an
-auto-increment integer, not human-readable. This phase adds an optional
-per-run `slug` so a preview can live at `<slug>.preview.<base>` instead
-(e.g. `myfeature.preview.<base>`). The `.preview.` infix is kept: it keeps
-the slug space disjoint from dashboard routes at bare `<base>`, and the
-cookie subdomain scoping (`Domain=<base>`) is unchanged.
+Every preview lives at `<slug>.preview.<base>`: the slug is required, never
+optional. The launcher always assigns a random slug (e.g. `tx7k2m9p`); the
+owner can switch to a custom human-readable slug (e.g. `myfeature`). There is
+no `<runId>.preview` form anymore, so a `public` run with a random slug is
+reachable only by its unguessable URL. The `.preview.` infix is kept: it keeps
+the slug space disjoint from dashboard routes at bare `<base>`, and the cookie
+subdomain scoping (`Domain=<base>`) is unchanged.
 
 Schema (`runs` table):
-- `slug text unique` (nullable; when null, the run uses its `runId` as today)
-- Slug rules: `[a-z0-9-]`, 1-63 chars, no leading/trailing hyphen, no `--`
-  (collides with the `<label>--<runId>` separator at `preview-host.ts:12`).
-  Reserved-name blocklist is unnecessary because the `.preview.` infix keeps
-  slug space disjoint from app routes.
+- `slug text` + unique index `runs_slug_unique` (unique as an INDEX, not a
+  column constraint: SQLite can't ALTER TABLE ADD a UNIQUE column). The column
+  stays technically nullable because SQLite can't ALTER a column to NOT NULL;
+  the migration backfills every legacy row with `run-<id>` and the launch
+  endpoint requires a slug, so no NULL row exists in practice.
+- Slug rules: `[a-z]` start, `[a-z0-9-]` body, 1-63 chars, no leading/trailing
+  hyphen, no `--` (collides with the `<label>--<slug>` separator at
+  `preview-host.ts`). Reserved-name blocklist is unnecessary because the
+  `.preview.` infix keeps slug space disjoint from app routes.
 
 Code changes (all host knowledge is centralized in
 `shared/utils/preview-host.ts` plus one duplicated copy in the `BRIDGE_SCRIPT`
 at `preview-proxy.ts:32`):
-- `preview-host.ts:12`: broaden the regex to accept either digits (legacy
-  `<runId>`) or a slug (`[a-z][a-z0-9-]*`). `parsePreviewHost` returns
-  `{ runId?: number, slug?: string, label?: string }`. Callers resolve the
-  run by whichever key is present.
-- `preview-host.ts:40`: `previewHostname` accepts either a runId or a slug.
-- `preview-proxy.ts:32`: the `BRIDGE_SCRIPT` regex must be updated in
-  lockstep.
-- `server/routes/tls-ask.get.ts:19-21`: canonicalize using the slug (or
-  runId) and require exact equality, same as today.
-- `server/middleware/preview.ts:9`: pass both slug and runId downstream.
-- `server/utils/preview-proxy.ts:82`: look up run by slug when present, by
-  id otherwise. New helper `getRunBySlug`.
-- `server/daemon/ddev.ts:100-104`: the slug must be known at boot time so
-  the env URL translator uses it.
-- `app/components/KPreviewBrowser.vue:50`: the postMessage origin guard
-  compares runId; needs to compare slug too (or resolve slug -> runId first).
-- Launcher (`server/api/runs/launch.post.ts`): accept an optional `slug`
-  field. Catch `SQLITE_CONSTRAINT_UNIQUE` and reject or append a suffix.
-- UI (`app/pages/runs/new.vue`): add a slug input field with live
-  availability check. When visibility is `public`, offer two slug
-  strategies: auto-generated random slug (unguessable, acts as a secret
-  link) or user-chosen custom slug (human-readable, truly public).
+- `preview-host.ts`: slug-only regex (`[a-z][a-z0-9-]*`). `parsePreviewHost`
+  returns `{ slug, label? }`. `previewHostname(slug, base, label?)` takes a
+  slug only. `previewKey(run)` is the canonical key for a run row
+  (`run.slug ?? 'run-' + run.id`, the fallback mirrors the migration's
+  backfill).
+- `server/routes/tls-ask.get.ts`: resolve by slug via `getRunBySlug`, then
+  require exact canonical equality (previewKey).
+- `server/utils/preview-proxy.ts`: resolve the run by `ref.slug`, canonical
+  host check via `previewKey`.
+- `server/middleware/preview.ts`: passes the parsed ref downstream.
+- `server/daemon/ddev.ts`: the env URL translator builds preview origins from
+  the run's slug (known at boot).
+- `app/components/KPreviewBrowser.vue`: the postMessage origin guard compares
+  `ref.slug === props.slug`; the `slug` prop is required.
+- Launcher (`server/api/runs/launch.post.ts`): `slug` is a required field.
+  Catch `SQLITE_CONSTRAINT_UNIQUE` and reject.
+- UI (`app/pages/runs/new.vue`): a "Random link / Custom slug" selector,
+  always visible, with a random slug generated on mount. Live availability
+  check on the custom slug.
 
 The Caddyfile needs no change: the existing `on_demand_tls` block already
 routes every unknown SNI through `tls-ask`, which becomes the sole arbiter
 of what gets a cert.
 
-Backward compatibility: every existing run has `slug = null` and keeps
-working at `<runId>.preview.<base>`. New runs can opt into a slug.
+Backward compatibility: the migration backfills existing (Phase 3) runs with
+`slug = 'run-' || id`, so they keep working at `run-<id>.preview.<base>`.
 
 ### Visibility modes
 

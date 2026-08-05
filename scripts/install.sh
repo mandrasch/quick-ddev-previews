@@ -228,7 +228,7 @@ echo "Next steps:"
 if [ "$DOMAIN" = "lvh.me" ]; then
   echo "  1. Open https://lvh.me in your browser and create your admin account."
   echo "  2. Accept the certificate warning once (Caddy's internal CA)."
-  echo "  3. Previews are at https://<runId>.preview.lvh.me (also reachable only"
+  echo "  3. Previews are at https://<slug>.preview.lvh.me (also reachable only"
   echo "     from this machine; no ports are opened)."
   echo
   echo "   (The Mac must resolve lvh.me to 127.0.0.1: use Cloudflare/Google"

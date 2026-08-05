@@ -1,5 +1,5 @@
-import { parsePreviewHost, previewHostname } from '../../shared/utils/preview-host'
-import { getRun } from '../utils/entities'
+import { parsePreviewHost, previewHostname, previewKey } from '../../shared/utils/preview-host'
+import { getRunBySlug } from '../utils/entities'
 
 // Caddy's on_demand_tls "ask" endpoint (see Caddyfile): 200 means "issue a
 // certificate for this hostname", any error status means refuse. This is the
@@ -14,10 +14,12 @@ export default defineEventHandler((event) => {
 
   if (domain === base) return 'ok'
 
-  // Only the canonical form [<label>--]<runId>.preview.<base> of an existing
+  // Only the canonical form [<label>--]<slug>.preview.<base> of an existing
   // run qualifies; reconstruct and compare so nothing sneaks in around it.
   const ref = parsePreviewHost(domain)
-  if (!ref || !getRun(ref.runId)) throw createError({ statusCode: 404 })
-  if (domain !== previewHostname(ref.runId, base, ref.label)) throw createError({ statusCode: 404 })
+  if (!ref) throw createError({ statusCode: 404 })
+  const run = getRunBySlug(ref.slug)
+  if (!run) throw createError({ statusCode: 404 })
+  if (domain !== previewHostname(previewKey(run), base, ref.label)) throw createError({ statusCode: 404 })
   return 'ok'
 })

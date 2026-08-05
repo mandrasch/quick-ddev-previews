@@ -29,6 +29,80 @@ const envText = ref('')
 const launching = ref(false)
 const launchError = ref<string | null>(null)
 
+// ── Preview access (Phase 8) ───────────────────────────────────────────────
+type Visibility = 'private' | 'password' | 'public'
+const visibility = ref<Visibility>('private')
+const previewPassword = ref('')
+
+// Subdomain: every run gets a slug, always. The owner picks between an
+// auto-generated random slug (the URL itself is the secret for `public`
+// previews) and a custom human-readable slug. There is no `<runId>.preview`
+// form anymore.
+const slug = ref('')
+const slugMode = ref<'random' | 'custom'>('random')
+const slugStatus = ref<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
+
+// Ambiguous characters omitted so a typed random link is easy to read out.
+const SLUG_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'
+
+function randomSlug(len = 8): string {
+  const bytes = new Uint8Array(len)
+  crypto.getRandomValues(bytes)
+  let out = ''
+  for (let i = 0; i < len; i++) {
+    const b = bytes[i] ?? 0
+    out += SLUG_CHARS[b % SLUG_CHARS.length]
+  }
+  return out
+}
+
+async function slugAvailable(s: string): Promise<boolean> {
+  if (!isValidSlug(s)) return false
+  try {
+    const res = await $fetch<{ available: boolean, valid: boolean }>('/api/runs/slug-available', { query: { slug: s } })
+    return res.valid && res.available
+  }
+  catch {
+    return false
+  }
+}
+
+async function regenerateSlug() {
+  for (let i = 0; i < 20; i++) {
+    const s = randomSlug()
+    if (await slugAvailable(s)) {
+      slug.value = s
+      slugStatus.value = 'available'
+      return
+    }
+  }
+  slug.value = randomSlug()
+  slugStatus.value = 'idle'
+}
+
+// A slug is never optional: suggest a random one from the start.
+onMounted(() => void regenerateSlug())
+
+// Live availability check for the custom slug field (debounced).
+let slugTimer: ReturnType<typeof setTimeout> | undefined
+watch(slug, (val) => {
+  clearTimeout(slugTimer)
+  if (slugMode.value !== 'custom') return
+  const s = val.trim().toLowerCase()
+  if (!s) {
+    slugStatus.value = 'idle'
+    return
+  }
+  if (!isValidSlug(s)) {
+    slugStatus.value = 'invalid'
+    return
+  }
+  slugStatus.value = 'checking'
+  slugTimer = setTimeout(async () => {
+    slugStatus.value = (await slugAvailable(s)) ? 'available' : 'taken'
+  }, 350)
+})
+
 // The branch picker loads branches for the selected repo.
 watch(repo, async (r) => {
   branch.value = ''
@@ -81,6 +155,20 @@ async function launch() {
     launchError.value = 'Select a branch'
     return
   }
+  if (visibility.value === 'password' && !previewPassword.value) {
+    launchError.value = 'Set a preview password'
+    return
+  }
+
+  const finalSlug = slug.value.trim().toLowerCase()
+  if (!finalSlug) {
+    launchError.value = 'A preview URL slug is required'
+    return
+  }
+  if (!isValidSlug(finalSlug)) {
+    launchError.value = 'Invalid slug: lowercase letters, digits and dashes only; no leading/trailing dash, no double dash.'
+    return
+  }
 
   launching.value = true
   try {
@@ -91,6 +179,9 @@ async function launch() {
         branch: branch.value,
         startCommand: startCommand.value.trim(),
         envVars: parseEnv(envText.value),
+        slug: finalSlug,
+        visibility: visibility.value,
+        previewPassword: visibility.value === 'password' ? previewPassword.value : undefined,
       },
     })
     await navigateTo(`/runs/${res.runId}`)
@@ -200,7 +291,113 @@ async function launch() {
           </div>
         </UFormField>
 
-        <!-- 5. Upload placeholders (no function yet) -->
+        <!-- 5. Preview access -->
+        <section class="flex flex-col gap-5 border-t border-default pt-5">
+          <UFormField
+            label="Who can view this preview?"
+            class="max-w-md"
+          >
+            <URadioGroup
+              v-model="visibility"
+              orientation="horizontal"
+              :items="[
+                { label: 'Private', value: 'private' },
+                { label: 'Password', value: 'password' },
+                { label: 'Public', value: 'public' },
+              ]"
+            />
+          </UFormField>
+          <small class="-mt-3 text-muted">
+            Private: logged-in admins only. Password: anyone with the URL plus the password.
+            Public: anyone with the URL.
+          </small>
+
+          <UFormField
+            v-if="visibility === 'password'"
+            label="Preview password"
+            required
+            class="max-w-md"
+          >
+            <UInput
+              v-model="previewPassword"
+              type="password"
+              placeholder="Shared with your testers"
+              size="lg"
+              block
+            />
+          </UFormField>
+
+          <UFormField
+            label="Slug strategy"
+            class="max-w-md"
+          >
+            <URadioGroup
+              v-model="slugMode"
+              orientation="horizontal"
+              :items="[
+                { label: 'Random link', value: 'random' },
+                { label: 'Custom slug', value: 'custom' },
+              ]"
+            />
+          </UFormField>
+          <small
+            v-if="slugMode === 'random'"
+            class="-mt-3 text-muted"
+          >
+            A random, unguessable URL. For public previews the URL itself is the secret.
+          </small>
+
+          <UFormField
+            label="Preview URL slug"
+            class="max-w-md"
+          >
+            <div class="flex gap-2">
+              <UInput
+                v-model="slug"
+                :readonly="slugMode === 'random'"
+                :placeholder="slugMode === 'random' ? 'generating…' : 'e.g. my-feature'"
+                size="lg"
+                class="flex-1"
+                block
+              />
+              <UButton
+                v-if="slugMode === 'random'"
+                color="neutral"
+                variant="outline"
+                size="lg"
+                icon="i-lucide-refresh-cw"
+                aria-label="Generate a new random slug"
+                @click="regenerateSlug"
+              />
+            </div>
+            <div class="mt-1 flex items-center gap-1.5 text-xs">
+              <span
+                v-if="slugStatus === 'checking'"
+                class="text-muted"
+              >Checking…</span>
+              <span
+                v-else-if="slugStatus === 'available'"
+                class="text-emerald-400"
+              >Slug available</span>
+              <span
+                v-else-if="slugStatus === 'taken'"
+                class="text-red-400"
+              >Slug already in use</span>
+              <span
+                v-else-if="slugStatus === 'invalid'"
+                class="text-red-400"
+              >
+                Lowercase letters, digits and dashes; no leading/trailing dash, no double dash.
+              </span>
+              <span
+                v-else
+                class="text-muted"
+              >Preview URL: {{ slug || '…' }}.preview.&lt;base&gt;</span>
+            </div>
+          </UFormField>
+        </section>
+
+        <!-- 6. Upload placeholders (no function yet) -->
         <UFormField label="Optional uploads">
           <div class="grid gap-3 sm:grid-cols-2">
             <div class="flex items-center justify-between rounded-lg border border-dashed border-default px-4 py-3">
@@ -243,7 +440,7 @@ async function launch() {
           :description="launchError"
         />
 
-        <!-- 6. Launch -->
+        <!-- 7. Launch -->
         <UButton
           color="primary"
           size="lg"

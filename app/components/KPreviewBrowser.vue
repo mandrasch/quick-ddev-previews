@@ -6,7 +6,8 @@
 // `nav` messages up, the chrome posts `cmd` messages down.
 
 const props = withDefaults(defineProps<{
-  runId: number
+  /** The run's slug: previews live at <slug>.preview.<base>. */
+  slug: string
   /** All ddev hostnames the run serves, primary first (run.previewHosts). */
   hosts?: string[]
   /** The preview is browsable: the env is up AND the boot finished. */
@@ -26,7 +27,7 @@ const live = computed(() => props.online)
 // The per-run preview origin for one of the project's ddev hostnames.
 function originFor(host: string | null): string {
   const label = host && host !== primaryHost.value ? previewLabel(host) : undefined
-  return `${reqUrl.protocol}//${previewHostname(props.runId, reqUrl.host, label)}`
+  return `${reqUrl.protocol}//${previewHostname(props.slug, reqUrl.host, label)}`
 }
 
 const homeUrl = `${originFor(null)}/`
@@ -47,7 +48,9 @@ function onMessage(e: MessageEvent) {
   const data = e.data as { knecht?: string, href?: string } | null
   if (data?.knecht !== 'nav' || typeof data.href !== 'string') return
   if (e.source !== frame.value?.contentWindow) return
-  if (parsePreviewHost(new URL(e.origin).host)?.runId !== props.runId) return
+  const ref = parsePreviewHost(new URL(e.origin).host)
+  // Match by the run's slug: the only host key a run answers on.
+  if (ref?.slug !== props.slug) return
 
   bridged.value = true
   currentUrl.value = data.href
