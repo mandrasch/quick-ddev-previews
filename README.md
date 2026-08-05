@@ -68,6 +68,41 @@ Use option 1, or option 2 if you want to connect a real domain. Option 3 is not 
 
 Video: [PoC: Quick DDEV previews - on a hetzner VPS](https://www.youtube.com/watch?v=FRNQ9RinErQ) - youtube.com.
 
+## Updating
+
+Releases are git tags (`vX.Y.Z`) built by CI into
+`ghcr.io/mandrasch/quick-ddev-previews`. New migrations apply automatically on
+the next boot (`server/plugins/migrate.ts`), so updating keeps your data intact
+(the SQLite DB lives in the `/data/quickddevpreviews/data` volume, untouched by
+deploys). Manual equivalent on the server:
+
+```bash
+cd /opt/quickddevpreviews
+git fetch --tags && git checkout vX.Y.Z
+sed -i 's/^QUICKDDEVPREVIEWS_VERSION=.*/QUICKDDEVPREVIEWS_VERSION=vX.Y.Z/' .env
+docker compose pull && docker compose up -d
+```
+
+Host-level changes (Docker, the ddev CLI, the image warm-up) are not covered by
+that: release notes call it out when the provisioning script must be re-run. It
+is idempotent, safe to run anytime:
+
+```bash
+sudo bash /opt/quickddevpreviews/scripts/provision-host.sh
+```
+
+### Notes for operators
+
+Let's Encrypt issues at most 50 new certificates per week per domain. Each
+newly visited preview hostname uses one; renewals don't. Heavy multi-user
+instances can switch to a wildcard certificate instead: delegate the preview
+subzone to a DNS provider with API access (e.g. `preview.<your-domain> NS ->
+Hetzner DNS`, the main zone stays put), build Caddy with the matching DNS
+plugin, and replace the `on_demand` block with `tls { dns <provider> }` in the
+Caddyfile. This requires a real domain: the sslip.io base domain is not under
+your control, so it cannot be delegated.
+
+
 ## 2. Self-host on a Mac (home server)
 
 The run substrate (host Docker + ddev) is Linux-only, so on a Mac the same
@@ -111,7 +146,7 @@ inside come back up on their own. Updating and backups work exactly as below,
 with `/opt/quickddevpreviews` and `/data/quickddevpreviews` living inside the
 VM (`limactl shell quickddevpreviews`).
 
-## Develop locally (build new features)
+## 3. Develop locally (build new features)
 
 This is for building the code, not for running the installed product (that is
 the installer path above). quickddevpreviews needs a Linux host with Docker and
@@ -231,6 +266,36 @@ per-run preview subdomains (`<runId>.preview.lvh.me`) share the session cookie
 with the dashboard. Previews need a Linux host with Docker + the ddev CLI
 (`scripts/provision-host.sh` installs both; the app image ships ddev too).
 
+### Preparing a release
+
+Before tagging a release, verify a fresh install still works. The
+`scripts/test-install.sh` script does that locally: it boots a throwaway Lima VM
+as a stand-in for a fresh VPS, runs the installer from your checkout inside it,
+and waits until the dashboard answers (fresh DB + migrations applied):
+
+```bash
+bash scripts/test-install.sh          # tests the currently checked-out branch
+bash scripts/test-install.sh v0.5.0   # or a specific branch / tag
+```
+
+It runs `install.sh` in the deterministic `lvhme` mode (Caddy's internal CA), so
+no public IP or Let's Encrypt is involved; the sslip.io / TLS path still needs a
+real VPS. The VM is deleted when done; keep it for manual inspection with
+`QUICKDDEVPREVIEWS_TEST_KEEP=1`.
+
+Then tag the release. Pushing a `v*.*.*` tag runs the CI pipeline
+(`.github/workflows/release.yml`): it builds the amd64 + arm64 images, merges
+them under the tag on GHCR, and creates the GitHub Release:
+
+```bash
+git tag v0.5.0 && git push origin v0.5.0
+```
+
+A tag with a hyphen (e.g. `v0.5.0-rc.1`) is published as a **prerelease** and
+does NOT move the `latest` image tag; only stable tags do. To pull a prerelease
+onto a real VPS for a wider test, run the installer with
+`QUICKDDEVPREVIEWS_REF=v0.5.0-rc.1` on a fresh server.
+
 ## Password reset
 
 If you lose access, run from the server:
@@ -239,6 +304,7 @@ If you lose access, run from the server:
 cd /opt/quickddevpreviews
 docker compose exec quickddevpreviews npm run reset-password <email>
 ```
+
 
 ## Tech stack
 
