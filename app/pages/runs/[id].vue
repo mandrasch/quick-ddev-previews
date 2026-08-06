@@ -27,6 +27,31 @@ const isBooting = computed(() =>
   run.value?.status === 'running' && run.value.previewReady !== true,
 )
 
+// ── Log auto-scroll (toggleable) ────────────────────────────────────────────
+const logEl = ref<HTMLElement | null>(null)
+const autoScrollLog = ref(true)
+
+function scrollLogToBottom() {
+  nextTick(() => {
+    if (autoScrollLog.value && logEl.value) {
+      logEl.value.scrollTop = logEl.value.scrollHeight
+    }
+  })
+}
+
+function toggleAutoScroll() {
+  autoScrollLog.value = !autoScrollLog.value
+  if (autoScrollLog.value) scrollLogToBottom()
+}
+
+watch(() => run.value?.log, () => {
+  if (autoScrollLog.value) scrollLogToBottom()
+})
+
+// Scroll to the bottom on first render too (SSR/hydration doesn't fire the
+// watch), and again once a client-side fetch fills the log.
+onMounted(() => scrollLogToBottom())
+
 // ── Run controls (Retry / Reboot / Stop / Start / Cancel / Pull) ───────────
 const { pending: actionPending, runAction } = useRunActions(() => void refresh())
 
@@ -253,15 +278,6 @@ async function deleteRun() {
   await navigateTo('/runs')
 }
 
-function statusColor(status: string) {
-  switch (status) {
-    case 'success': return 'primary'
-    case 'running': case 'queued': return 'orange'
-    case 'failed': case 'cancelled': return 'error'
-    default: return 'neutral'
-  }
-}
-
 // ── Terminal modal (SSH into the running env) ────────────────────────────────
 interface SshInfo {
   services: string[]
@@ -315,59 +331,37 @@ async function copySshCommand() {
       class="flex flex-col gap-8"
     >
       <!-- Instance details -->
-      <div class="flex items-start justify-between border border-red-500">
-        <div>
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0 flex-1">
           <NuxtLink
-              to="/runs"
-              class="text-sm text-muted hover:text-toned"
-            >
-              ← Previews
-            </NuxtLink>
-          <div class="flex items-center gap-3">
-            
-            <h1 class="text-2xl font-bold text-highlighted">
+            to="/runs"
+            class="text-sm text-muted hover:text-toned"
+          >
+            ← Previews
+          </NuxtLink>
+          <div class="k-mono truncate text-sm text-highlighted">
+            {{ previewUrl }}
+          </div>
+          <div class="mt-0.5 flex items-center gap-1.5 text-2xs text-dimmed">
+            <UIcon
+              name="i-simple-icons-github"
+              class="size-3 flex-none text-muted"
+            />
+            <span class="truncate font-medium text-toned">
               {{ run.fullName }}
-            </h1>
-            <UBadge
-              v-if="run.visibility === 'public'"
-              color="success"
-              variant="subtle"
-              size="md"
-            >
-              public
-            </UBadge>
-            <UBadge
-              v-else-if="run.visibility === 'password'"
-              color="warning"
-              variant="subtle"
-              size="md"
-            >
-              password
-            </UBadge>
-            <UBadge
-              v-else
-              color="neutral"
-              variant="subtle"
-              size="md"
-            >
-              private
-            </UBadge>
-          </div>
-          <div class="mt-1 flex items-center gap-3 text-sm text-muted">
-            <span class="font-mono">Branch: {{ run.branch }}</span>
-            <!-- <span class="text-dimmed">#{{ run.id }}</span>-->
-            <!-- <span
-              class="flex items-center gap-1.5"
-              :style="{ color: statusColor(run.status) }"
-            >
-              <span
-                class="size-2 flex-none rounded-full"
-                :style="{ background: statusColor(run.status) }"
-              />
-              {{ run.status }}
             </span>
-            -->
+            <span class="flex-none">{{ run.branch }} · #{{ run.id }}</span>
           </div>
+        </div>
+        <div class="flex flex-none items-center gap-3 pl-4">
+          <UBadge
+            v-if="run.visibility !== 'private'"
+            :color="run.visibility === 'public' ? 'success' : 'warning'"
+            variant="subtle"
+            size="sm"
+          >
+            {{ run.visibility }}
+          </UBadge>
         </div>
       </div>
 
@@ -482,10 +476,24 @@ async function copySshCommand() {
       />
 
       <section class="k-card p-6">
-        <h2 class="text-lg font-semibold">
-          Log
-        </h2>
-        <pre class="k-mono mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-default bg-(--surface-base) p-4 text-2xs text-dimmed">{{ run.log || 'Waiting for the run to start…' }}</pre>
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold">
+            Log
+          </h2>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            :icon="autoScrollLog ? 'i-lucide-arrow-down-to-line' : 'i-lucide-x'"
+            @click="toggleAutoScroll"
+          >
+            Auto-scroll {{ autoScrollLog ? 'on' : 'off' }}
+          </UButton>
+        </div>
+        <pre
+          ref="logEl"
+          class="k-mono mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-default bg-(--surface-base) p-4 text-2xs text-dimmed"
+        >{{ run.log || 'Waiting for the run to start…' }}</pre>
       </section>
 
       <!-- Share + preview access -->
