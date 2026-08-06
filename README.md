@@ -5,6 +5,12 @@ A self-hosted service for generating DDEV preview environments. Install it on a 
 > [!WARNING]
 > Experimental, use at your own risk. This project is an early preview and proof of concept - no warranties given.
 
+## Demo videos
+
+- [PoC: Quick DDEV previews - on a hetzner VPS](https://www.youtube.com/watch?v=FRNQ9RinErQ) - youtube.com
+- [PoC: Quick (selfhosted) DDEV previews - local installation OSX](https://www.youtube.com/watch?v=sS0WUtyXYm4&feature=youtu.be) - youtube.com
+
+
 ## 🚧 (Experimental) fork of Knecht Cloud 🚧
 
 This is a fork of https://github.com/knecht-works/knecht-cloud, a project made by the amazingly talented Samuel Reichör.  Significant changes made:
@@ -13,11 +19,6 @@ This is a fork of https://github.com/knecht-works/knecht-cloud, a project made b
 - Add support for `sslip.io`, so no external domain required on install
 - Registration flow changed to email/password first
 - Added public / private / password sharing and custom URL slug
-
-## Demo videos
-
-- [PoC: Quick DDEV previews - on a hetzner VPS](https://www.youtube.com/watch?v=FRNQ9RinErQ) - youtube.com
-- [PoC: Quick (selfhosted) DDEV previews - local installation](https://www.youtube.com/watch?v=sS0WUtyXYm4&feature=youtu.be) - youtube.com
 
 ## Screenshots
 
