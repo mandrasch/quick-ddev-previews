@@ -34,13 +34,18 @@ type Visibility = 'private' | 'password' | 'public'
 const visibility = ref<Visibility>('private')
 const previewPassword = ref('')
 
-// Subdomain: every run gets a slug, always. The owner picks between an
-// auto-generated random slug (the URL itself is the secret for `public`
-// previews) and a custom human-readable slug. There is no `<runId>.preview`
-// form anymore.
+// Subdomain: every run gets a slug, always. The owner types a custom,
+// human-readable slug and sees the full URL preview; a helper button swaps in
+// an unguessable random slug (for `public` previews the URL itself is the
+// secret). There is no `<runId>.preview` form anymore.
 const slug = ref('')
-const slugMode = ref<'random' | 'custom'>('random')
 const slugStatus = ref<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
+
+// Live full-URL preview (same shape as the run detail page's share URL).
+const reqUrl = useRequestURL()
+const previewUrl = computed(() =>
+  `${reqUrl.protocol}//${slug.value.trim().toLowerCase() || '…'}.preview.${reqUrl.host}/`,
+)
 
 // Ambiguous characters omitted so a typed random link is easy to read out.
 const SLUG_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'
@@ -80,14 +85,10 @@ async function regenerateSlug() {
   slugStatus.value = 'idle'
 }
 
-// A slug is never optional: suggest a random one from the start.
-onMounted(() => void regenerateSlug())
-
-// Live availability check for the custom slug field (debounced).
+// Live availability check for the slug field (debounced).
 let slugTimer: ReturnType<typeof setTimeout> | undefined
 watch(slug, (val) => {
   clearTimeout(slugTimer)
-  if (slugMode.value !== 'custom') return
   const s = val.trim().toLowerCase()
   if (!s) {
     slugStatus.value = 'idle'
@@ -237,10 +238,98 @@ async function launch() {
           />
         </UFormField>
 
+        <!-- Preview access -->
+        <section class="flex flex-col gap-5">
+          <UFormField
+            label="Preview URL slug"
+            required
+            class="max-w-md"
+          >
+            <UInput
+              v-model="slug"
+              placeholder="e.g. my-feature"
+              size="lg"
+              block
+              class="w-full"
+            />
+            <div class="mt-1">
+              <span
+                v-if="slugStatus === 'checking'"
+                class="text-muted max-w-md"
+              >Checking…</span>
+              <span
+                v-else-if="slugStatus === 'available'"
+                class=" max-w-md text-xs text-emerald-400"
+              >Slug available</span>
+              <span
+                v-else-if="slugStatus === 'taken'"
+                class="max-w-md text-xs text-red-400"
+              >Slug already in use</span>
+              <span
+                v-if="slugStatus === 'invalid'"
+                class="max-w-md text-xs text-red-400"
+              >
+                Lowercase letters, digits and dashes; no leading/trailing dash, no double dash, no leading digits.
+              </span>
+          </div>
+          </UFormField>
+
+          <div class="flex max-w-md items-center gap-1 rounded-lg border border-default bg-(--surface-glass) px-3 py-2.5">
+            <UIcon
+              name="i-lucide-link"
+              class="size-4 flex-none text-muted"
+            />
+            <span class="k-mono truncate text-sm text-highlighted">{{ previewUrl }}</span>
+          </div>
+          <!-- TODO: move to better position -->
+          
+
+
+
+          <UFormField
+            label="Who can view this preview?"
+            required
+            class="max-w-md"
+          >
+            <URadioGroup
+              v-model="visibility"
+              orientation="horizontal"
+              :items="[
+                { label: 'Private', value: 'private' },
+                { label: 'Password', value: 'password' },
+                { label: 'Public', value: 'public' },
+              ]"
+            />
+          </UFormField>
+          <small class="-mt-3 text-muted">
+            Private: logged-in admins only. Password: anyone with the URL plus the password.
+            Public: anyone with the URL.
+          </small>
+
+          <UFormField
+            v-if="visibility === 'password'"
+            label="Preview password"
+            required
+            class="max-w-md"
+          >
+            <UInput
+              v-model="previewPassword"
+              type="password"
+              placeholder="Shared with your testers"
+              size="lg"
+              block
+            />
+          </UFormField>
+
+          
+        </section>
+
+        <span class="border-t border-default pt-5 w-full" />
+
         <!-- 3. Custom start command -->
         <UFormField
           label="Post start command"
-          class="max-w-md"
+          class="max-w-md "
         >
           <UInput
             v-model="startCommand"
@@ -278,112 +367,6 @@ async function launch() {
           </div>
           <small>Injected at launch and translated to preview URLs. The project's own .env file can be edited later in the run's integrated VS Code.</small>
         </UFormField>
-
-        <!-- 5. Preview access -->
-        <section class="flex flex-col gap-5 border-t border-default pt-5">
-          <UFormField
-            label="Who can view this preview?"
-            class="max-w-md"
-          >
-            <URadioGroup
-              v-model="visibility"
-              orientation="horizontal"
-              :items="[
-                { label: 'Private', value: 'private' },
-                { label: 'Password', value: 'password' },
-                { label: 'Public', value: 'public' },
-              ]"
-            />
-          </UFormField>
-          <small class="-mt-3 text-muted">
-            Private: logged-in admins only. Password: anyone with the URL plus the password.
-            Public: anyone with the URL.
-          </small>
-
-          <UFormField
-            v-if="visibility === 'password'"
-            label="Preview password"
-            required
-            class="max-w-md"
-          >
-            <UInput
-              v-model="previewPassword"
-              type="password"
-              placeholder="Shared with your testers"
-              size="lg"
-              block
-            />
-          </UFormField>
-
-          <UFormField
-            label="Slug strategy"
-            class="max-w-md"
-          >
-            <URadioGroup
-              v-model="slugMode"
-              orientation="horizontal"
-              :items="[
-                { label: 'Random link', value: 'random' },
-                { label: 'Custom slug', value: 'custom' },
-              ]"
-            />
-          </UFormField>
-          <small
-            v-if="slugMode === 'random'"
-            class="-mt-3 text-muted"
-          >
-            A random, unguessable URL. For public previews the URL itself is the secret.
-          </small>
-
-          <UFormField
-            label="Preview URL slug"
-            class="max-w-md"
-          >
-            <div class="flex gap-2">
-              <UInput
-                v-model="slug"
-                :readonly="slugMode === 'random'"
-                :placeholder="slugMode === 'random' ? 'generating…' : 'e.g. my-feature'"
-                size="lg"
-                class="flex-1"
-                block
-              />
-              <UButton
-                v-if="slugMode === 'random'"
-                color="neutral"
-                variant="outline"
-                size="lg"
-                icon="i-lucide-refresh-cw"
-                aria-label="Generate a new random slug"
-                @click="regenerateSlug"
-              />
-            </div>
-            <div class="mt-1 flex items-center gap-1.5 text-xs">
-              <span
-                v-if="slugStatus === 'checking'"
-                class="text-muted"
-              >Checking…</span>
-              <span
-                v-else-if="slugStatus === 'available'"
-                class="text-emerald-400"
-              >Slug available</span>
-              <span
-                v-else-if="slugStatus === 'taken'"
-                class="text-red-400"
-              >Slug already in use</span>
-              <span
-                v-else-if="slugStatus === 'invalid'"
-                class="text-red-400"
-              >
-                Lowercase letters, digits and dashes; no leading/trailing dash, no double dash.
-              </span>
-              <span
-                v-else
-                class="text-muted"
-              >Preview URL: {{ slug || '…' }}.preview.&lt;base&gt;</span>
-            </div>
-          </UFormField>
-        </section>
 
         <!-- 6. Upload placeholders (no function yet) -->
         <UFormField label="Optional uploads">
