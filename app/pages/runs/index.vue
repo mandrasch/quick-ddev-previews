@@ -25,40 +25,18 @@ function statusColor(status: string) {
   }
 }
 
-// Quick actions + environment state on the list rows.
-const { pending, runAction } = useRunActions(() => void refresh())
-
-function canCancel(run: { status: string }) {
-  return run.status === 'queued' || run.status === 'running'
+// Simplified status for the list rows: running, stopped, or boot failed.
+function runStateLabel(run: { status: string, envState: string }): string {
+  if (run.status === 'failed' || run.status === 'cancelled') return 'boot failed'
+  if (run.envState === 'stopped') return 'stopped'
+  return 'running'
 }
 
-function cancel(run: { id: number }) {
-  return runAction(run.id, 'cancel', { success: 'Run cancelled' })
-}
-
-function retry(run: { id: number, fullName: string }) {
-  return runAction(run.id, 'retry', {
-    confirm: `Retry ${run.fullName}? It boots again from the branch tip.`,
-    success: 'Run queued for a fresh boot',
-  })
-}
-
-function stop(run: { id: number }) {
-  return runAction(run.id, 'stop', {
-    confirm: 'Stop this preview environment? Containers are removed, its volumes and checkout are kept.',
-    success: 'Environment stopped',
-  })
-}
-
-function start(run: { id: number }) {
-  return runAction(run.id, 'start', { success: 'Environment started' })
-}
-
-function envStateColor(state: string) {
-  switch (state) {
-    case 'up': return 'text-emerald-400'
-    case 'stopped': return 'text-amber-400'
-    default: return 'text-dimmed'
+function visibilityBadgeColor(visibility: string) {
+  switch (visibility) {
+    case 'public': return 'success'
+    case 'password': return 'warning'
+    default: return 'neutral'
   }
 }
 </script>
@@ -138,73 +116,16 @@ function envStateColor(state: string) {
             </div>
           </NuxtLink>
           <div class="flex flex-none items-center gap-3 pl-4">
-            <span
-              v-if="run.previewReady && run.envState === 'up'"
-              class="k-mono text-2xs text-primary"
-            >
-              preview live
-            </span>
             <UBadge
-              v-if="run.visibility !== 'private'"
-              :color="run.visibility === 'public' ? 'success' : 'warning'"
+              :color="visibilityBadgeColor(run.visibility)"
               variant="subtle"
               size="sm"
             >
               {{ run.visibility }}
             </UBadge>
-            <div class="flex items-center gap-1">
-              <UButton
-                v-if="canCancel(run)"
-                color="error"
-                variant="ghost"
-                size="xs"
-                icon="i-lucide-circle-x"
-                aria-label="Cancel run"
-                :loading="pending === 'cancel'"
-                @click="cancel(run)"
-              />
-              <UButton
-                v-else
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                icon="i-lucide-rotate-ccw"
-                aria-label="Retry run"
-                :loading="pending === 'retry'"
-                @click="retry(run)"
-              />
-              <UButton
-                v-if="run.envState === 'up'"
-                color="warning"
-                variant="ghost"
-                size="xs"
-                icon="i-lucide-square"
-                aria-label="Stop environment"
-                :loading="pending === 'stop'"
-                @click="stop(run)"
-              />
-              <UButton
-                v-else-if="run.envState === 'stopped'"
-                color="primary"
-                variant="ghost"
-                size="xs"
-                icon="i-lucide-play"
-                aria-label="Start environment"
-                :loading="pending === 'start'"
-                @click="start(run)"
-              />
-            </div>
-            <div class="flex flex-col items-end gap-0.5">
-              <span
-                class="k-mono text-2xs uppercase tracking-wider"
-                :class="envStateColor(run.envState)"
-              >
-                {{ run.envState }}
-              </span>
-              <span class="k-mono text-2xs uppercase tracking-wider text-dimmed">
-                {{ run.status }}
-              </span>
-            </div>
+            <span class="k-mono text-2xs uppercase tracking-wider text-dimmed">
+              {{ runStateLabel(run) }}
+            </span>
           </div>
         </div>
       </div>

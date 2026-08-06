@@ -351,17 +351,14 @@ async function copySshCommand() {
               {{ run.fullName }}
             </span>
             <span class="flex-none">{{ run.branch }} · #{{ run.id }}</span>
+            <UBadge
+              :color="run.visibility === 'public' ? 'success' : run.visibility === 'password' ? 'warning' : 'neutral'"
+              variant="subtle"
+              size="xs"
+            >
+              {{ run.visibility }}
+            </UBadge>
           </div>
-        </div>
-        <div class="flex flex-none items-center gap-3 pl-4">
-          <UBadge
-            v-if="run.visibility !== 'private'"
-            :color="run.visibility === 'public' ? 'success' : 'warning'"
-            variant="subtle"
-            size="sm"
-          >
-            {{ run.visibility }}
-          </UBadge>
         </div>
       </div>
 
