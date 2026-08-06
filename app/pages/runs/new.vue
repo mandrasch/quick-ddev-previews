@@ -48,9 +48,9 @@ const previewUrl = computed(() =>
 )
 
 // Ambiguous characters omitted so a typed random link is easy to read out.
-const SLUG_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'
+/* const SLUG_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789' */
 
-function randomSlug(len = 8): string {
+/* function randomSlug(len = 8): string {
   const bytes = new Uint8Array(len)
   crypto.getRandomValues(bytes)
   let out = ''
@@ -59,7 +59,7 @@ function randomSlug(len = 8): string {
     out += SLUG_CHARS[b % SLUG_CHARS.length]
   }
   return out
-}
+} */
 
 async function slugAvailable(s: string): Promise<boolean> {
   if (!isValidSlug(s)) return false
@@ -72,7 +72,7 @@ async function slugAvailable(s: string): Promise<boolean> {
   }
 }
 
-async function regenerateSlug() {
+/* async function regenerateSlug() {
   for (let i = 0; i < 20; i++) {
     const s = randomSlug()
     if (await slugAvailable(s)) {
@@ -83,7 +83,7 @@ async function regenerateSlug() {
   }
   slug.value = randomSlug()
   slugStatus.value = 'idle'
-}
+} */
 
 // Live availability check for the slug field (debounced).
 let slugTimer: ReturnType<typeof setTimeout> | undefined
@@ -271,7 +271,7 @@ async function launch() {
               >
                 Lowercase letters, digits and dashes; no leading/trailing dash, no double dash, no leading digits.
               </span>
-          </div>
+            </div>
           </UFormField>
 
           <div class="flex max-w-md items-center gap-1 rounded-lg border border-default bg-(--surface-glass) px-3 py-2.5">
@@ -282,9 +282,6 @@ async function launch() {
             <span class="k-mono truncate text-sm text-highlighted">{{ previewUrl }}</span>
           </div>
           <!-- TODO: move to better position -->
-          
-
-
 
           <UFormField
             label="Who can view this preview?"
@@ -320,8 +317,6 @@ async function launch() {
               block
             />
           </UFormField>
-
-          
         </section>
 
         <span class="border-t border-default pt-5 w-full" />
