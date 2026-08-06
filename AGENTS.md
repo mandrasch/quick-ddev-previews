@@ -259,10 +259,12 @@ The image-publishing pipeline is in place (`ghcr.io/mandrasch/quick-ddev-preview
   and pull requests
 - [x] `docker-compose.yml` image name:
   `ghcr.io/mandrasch/quick-ddev-previews:${QUICKDDEVPREVIEWS_VERSION:-latest}`
-- [ ] Set the GHCR package to **public** after the first release push (or
+- [x] Set the GHCR package to **public** after the first release push (or
   anonymous pulls on fresh servers fail)
-- [ ] Wire the System page version display to the baked-in
-  `QUICKDDEVPREVIEWS_VERSION` (app/pages/system.vue still hardcodes `dev`)
+- [x] Wire the System page version display to the baked-in
+  `QUICKDDEVPREVIEWS_VERSION` (Phase 12: `/system` reads it via
+  `GET /api/system` -> `server/utils/version.ts currentVersion()`, no longer
+  hardcoded, and offers an in-app owner-only update)
 
 Both workflows skip on doc-only changes (`paths-ignore`: `**.md`, `.gitignore`,
 `docs/**`), so editing README.md never triggers CI or an image build. That
@@ -519,6 +521,48 @@ Tasks:
       explicitly unsupported.
 - [ ] Optional: installer non-interactive flag to pre-select the mode in the
       lima-prod.yaml one-liner (documented, not required).
+
+## Phase 12 (done): in-app self-update + version display
+
+Port of the reference project's self-update. The System page (`/system`) shows
+the running version and, when a newer stable release exists, an owner-only
+**Update** button that swaps the instance to the new version with data intact.
+
+- `server/utils/version.ts`: `currentVersion()` reads the baked
+  `QUICKDDEVPREVIEWS_VERSION` (Dockerfile prod ENV set by CI from the build-arg;
+  dev/local builds report `dev`). `latestVersion()` + `listReleases()` poll
+  GitHub's releases API (unauth, 1h cache, failures cached too) against
+  `mandrasch/quick-ddev-previews`. `isNewerVersion()` does strict numeric
+  compare; candidates are always stable tags, so a running pre-release
+  (`v0.3.0-rc.1`) is superseded by its stable release and never offered.
+- `server/daemon/system.ts getSystemInfo()`: probes the host daemon (docker
+  server version, ddev CLI, running containers) + the version block.
+- `GET /api/system` (thin wrapper), `GET /api/system/releases` (changelog with
+  `isNew` marks), `POST /api/system/update` (owner-only, verifies a newer
+  release exists, then fires `startUpdate`).
+- `server/daemon/update.ts startUpdate(tag)`: Coolify-style sibling updater
+  container on the host daemon (`quickddevpreviews-updater`), running the NEW
+  release image (which ships git + docker CLI + compose). It advances the
+  `/opt/quickddevpreviews` checkout to the tag, updates
+  `QUICKDDEVPREVIEWS_VERSION` in `.env` (via
+  `QUICKDDEVPREVIEWS_INSTALL_DIR`, default `/opt/quickddevpreviews`), then
+  `docker compose pull && docker compose up -d`, which recreates the app.
+  Fire-and-forget: the request returns before the pull finishes; progress
+  lives in `docker logs quickddevpreviews-updater`. The UI polls `/api/system`
+  until the new version answers, then reloads.
+- `app/pages/system.vue`: version comes from `/api/system` (server-side env,
+  so the page no longer hardcodes `dev`), plus docker/ddev/host rows, the
+  update button (owner only) and a collapsible changelog of newer releases.
+- Updater container name and install dir are the only coupling to the manual
+  README flow; the `.env` key (`QUICKDDEVPREVIEWS_VERSION`) is the single
+  source of truth for what image the instance runs.
+
+Security: `POST /api/system/update` is owner-only (all users can read
+`/api/system`; only the owner can swap the running code). The updater runs as
+root in a sibling container on the host daemon, mounting the install dir and
+the docker socket, exactly like the reference; the pinned release image is
+pulled from GHCR, and `RELEASE_TAG_RE` rejects anything that is not a
+`vX.Y.Z` tag.
 
 ## Decisions
 

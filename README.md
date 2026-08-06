@@ -75,7 +75,11 @@ Releases are git tags (`vX.Y.Z`) built by CI into
 `ghcr.io/mandrasch/quick-ddev-previews`. New migrations apply automatically on
 the next boot (`server/plugins/migrate.ts`), so updating keeps your data intact
 (the SQLite DB lives in the `/data/quickddevpreviews/data` volume, untouched by
-deploys). Manual equivalent on the server:
+deploys).
+
+The System page (`/system`) shows the running version and, when a newer release
+exists, an **Update** button (owner only). It swaps the instance to the new
+version with data intact. The manual equivalent on the server:
 
 ```bash
 cd /opt/quickddevpreviews
