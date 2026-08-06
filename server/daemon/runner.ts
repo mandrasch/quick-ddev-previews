@@ -30,7 +30,7 @@ const controllers = new Map<number, AbortController>()
 // block the queue forever.
 const runningRuns = new Set<number>()
 
-function appendLog(runId: number, chunk: string): void {
+export function appendLog(runId: number, chunk: string): void {
   if (!chunk) return
   const row = db.select().from(runs).where(eq(runs.id, runId)).get()
   if (!row) return
@@ -173,11 +173,11 @@ async function runWithLog(
 }
 
 // Run an arbitrary shell command in the web container, streamed to the log.
-async function runShellInSandbox(
+export async function runShellInSandbox(
   runId: number,
   command: string,
   onLog: (line: string) => void,
-  signal: AbortSignal,
+  signal: AbortSignal | undefined,
 ): Promise<number> {
   const sub = execa('docker', [
     'exec', '-u', `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,

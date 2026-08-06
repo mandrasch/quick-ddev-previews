@@ -30,6 +30,9 @@ export async function prepareRunCheckout(
   try {
     if (existsSync(join(dir, '.git'))) {
       onLog(`Reusing checkout at ${dir}\n`)
+      // A reused checkout may be stale (a retry, or the feature branch moved):
+      // sync the working tree to the branch tip before anything else runs.
+      await pullRunBranch(project, runId, token, branch, onLog)
     }
     else {
       mkdirSync(dir, { recursive: true })
@@ -73,6 +76,9 @@ function shieldGeneratedFiles(dir: string): void {
     '/.ddev/config.quickddevpreviews.yaml',
     '/.ddev/docker-compose.quickddevpreviews.yaml',
     '/.ddev/mysql/00-quickddevpreviews-lowmem.cnf',
+    // The web IDE's state dir (daemon/ide.ts) lives under the checkout so it
+    // survives container recreates; it must never enter a commit.
+    '/.quickddevpreviews/',
   ]
   try {
     const current = existsSync(exclude) ? readFileSync(exclude, 'utf8') : ''
@@ -84,6 +90,61 @@ function shieldGeneratedFiles(dir: string): void {
   catch {
     // Best-effort.
   }
+}
+
+// Sync an existing checkout to the remote tip of a branch (the "git pull" of
+// a run): shallow-fetch the branch, hard-reset the working tree to it. Returns
+// whether the tip actually moved. The generated ddev overrides are git-excluded
+// (shieldGeneratedFiles), so a hard reset never touches them. Same auth and
+// redaction discipline as prepareRunCheckout.
+export interface PullResult {
+  updated: boolean
+  beforeSha: string
+  afterSha: string
+}
+
+export async function pullRunBranch(
+  project: Project,
+  runId: number,
+  token: string,
+  branch: string,
+  onLog: (line: string) => void,
+): Promise<PullResult> {
+  const dir = runCheckoutDir(runId)
+  try {
+    const beforeSha = await gitSha(dir, 'HEAD')
+    onLog(`Fetching ${project.fullName} (${branch})…\n`)
+    await git([...authFlags(token), '-C', dir, 'fetch', '--depth', '1', 'origin', branch])
+    const afterSha = await gitSha(dir, `origin/${branch}`)
+    if (afterSha === beforeSha) {
+      return { updated: false, beforeSha, afterSha }
+    }
+    onLog(`Pulled ${beforeSha.slice(0, 7)} → ${afterSha.slice(0, 7)}\n`)
+    await git(['-C', dir, 'reset', '--hard', `origin/${branch}`])
+    return { updated: true, beforeSha, afterSha }
+  }
+  catch (e) {
+    throw new Error(redact(String((e as Error).message), token), { cause: e })
+  }
+}
+
+// Does the remote tip of `branch` differ from the checkout's current HEAD?
+// Shallow-fetches to update the remote-tracking ref first. Best-effort: a
+// missing or broken checkout reports "not behind" instead of failing the run
+// page.
+export async function branchBehindTip(dir: string, branch: string, token: string): Promise<boolean> {
+  try {
+    await git([...authFlags(token), '-C', dir, 'fetch', '--depth', '1', 'origin', branch])
+    return (await gitSha(dir, 'HEAD')) !== (await gitSha(dir, `origin/${branch}`))
+  }
+  catch {
+    return false
+  }
+}
+
+async function gitSha(dir: string, ref: string): Promise<string> {
+  const { stdout } = await execa('git', ['-C', dir, 'rev-parse', ref])
+  return stdout.trim()
 }
 
 function git(args: string[]) {

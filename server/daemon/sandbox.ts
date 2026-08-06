@@ -88,6 +88,21 @@ export async function envStackRunning(runId: number): Promise<boolean> {
   }
 }
 
+// Stop the run's stack: containers are removed, the project's volumes (the
+// imported DB) and the checkout survive, so a later start is quick. Name-based,
+// so it works even when the checkout is already gone; when ddev doesn't know
+// the project (its registry lives in ~/.ddev, which can lag reality), removing
+// the labelled containers by hand is equivalent (volumes stay).
+export async function stopEnvStack(runId: number): Promise<void> {
+  ipCache.delete(runId)
+  try {
+    await execa('ddev', ['stop', runSandboxName(runId)], { env: DDEV_ENV })
+  }
+  catch {
+    await removeLabelledContainers(runId)
+  }
+}
+
 // Fully remove the run's environment: containers, volumes, the ddev project
 // registration. Best-effort: a missing project/containers is not an error.
 export async function removeEnvStack(runId: number): Promise<void> {

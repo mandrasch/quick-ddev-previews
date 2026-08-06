@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `post_pull_commands` text DEFAULT '[]' NOT NULL;

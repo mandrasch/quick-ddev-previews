@@ -36,6 +36,13 @@
       "when": 1785925337810,
       "tag": "0004_silent_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785957939994,
+      "tag": "0005_post_pull_commands",
+      "breakpoints": true
     }
   ]
 }

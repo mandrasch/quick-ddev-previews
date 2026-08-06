@@ -4,6 +4,7 @@ import { parse, stringify } from 'yaml'
 import { previewHostname, previewLabel } from '../../shared/utils/preview-host'
 import { dashboardOrigin } from '../utils/origin'
 import { runSandboxName } from '../utils/storage'
+import { IDE_CONTAINER_DIR, ideHostDir, ideStaged } from './ide'
 
 export interface EnvVar {
   key: string
@@ -66,8 +67,17 @@ key-buffer-size = 8M
 `)
 }
 
-// The compose override ddev merges into the project's generated stack.
+// The compose override ddev merges into the project's generated stack. The web
+// IDE server (a directory, staged by daemon/ide.ts into the tools dir, which
+// follows the same-path convention so the host daemon resolves it) is
+// bind-mounted read-only into the web container, where it is started on demand
+// from the run page. Included only when the staged dir actually exists: a
+// missing bind source would make docker create a root-owned DIRECTORY in its
+// place.
 function composeOverride(): Record<string, unknown> {
+  const volumes = ideStaged()
+    ? [`${ideHostDir()}:${IDE_CONTAINER_DIR}:ro`]
+    : []
   return {
     services: {
       web: {
@@ -77,6 +87,7 @@ function composeOverride(): Record<string, unknown> {
         // service networks as a mapping, and compose refuses to merge the two
         // shapes.
         networks: { [INGRESS_NETWORK]: {} },
+        ...(volumes.length ? { volumes } : {}),
       },
       db: { mem_limit: DB_MEM_LIMIT },
     },

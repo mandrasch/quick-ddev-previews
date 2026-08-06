@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
+import { stageIde } from '../daemon/ide'
 
 // One-time substrate prep at boot (idempotent, best-effort): writes the ddev
 // global config for THIS process's user (uid 1000, home /home/node, which is
@@ -27,6 +28,10 @@ export default defineNitroPlugin(() => {
   catch (e) {
     console.warn(`agent-tools: could not write ddev global config: ${(e as Error).message}`)
   }
+  // The web IDE server (~120MB download): best-effort like the rest; the first
+  // IDE click retries when this failed or hasn't finished yet.
+  void stageIde().catch(e =>
+    console.error('openvscode-server staging failed:', (e as Error).message))
 })
 
 const GLOBAL_CONFIG: Record<string, unknown> = {

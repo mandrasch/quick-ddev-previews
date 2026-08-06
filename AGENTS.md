@@ -210,13 +210,40 @@ Residual risks to track (not addressed in this phase):
 
 ## Phase 5 (next): lifecycle, db dump, framework detection, run controls
 
-- [ ] .env-editor which can edit the file anytime, not just on preview instance launch
-- [ ] button for git pull, if branch changes
-- [ ] vscode-server integration (see knecht-cloud)
+- [x] .env-editor which can edit the file anytime, not just on preview instance launch
+  - DROPPED in favor of the web IDE: the DB-driven run-page editor never
+    reflected the checkout's real `.env` file (it edits `runs.envVars`, the
+    launch-time ddev web_environment injection), so it was misleading. The
+    run page now guides users to edit `.env` in the integrated VS Code, which
+    sees the real mounted file.
+- [x] button for git pull, if branch changes
+  - `POST /api/runs/:id/pull` background job (run.pulling drives the button):
+    shallow-fetch + hard-reset the checkout to the branch tip, reconcile the
+    stack, re-run the start command. `GET /api/runs/:id/pull-status` powers the
+    "New commits available" hint. Retries also sync the checkout to the branch
+    tip first (`server/daemon/git.ts`).
+  - The run page's "Post-pull commands" editor (`PATCH
+    /api/runs/:id/post-pull-commands`, column `runs.post_pull_commands`,
+    migration `0005`) adds extra commands executed after a pull, in order,
+    after the start command (`server/daemon/run-controls.ts`). The "Init
+    commands" section shows the run's start command + boot state + a Retry
+    button (re-queue for a fresh boot).
+- [x] Retry / reboot / cancel buttons on the run page
+  - Retry (re-queue for a fresh boot), Reboot (re-apply env + restart stack),
+    Stop / Start (envState toggle, volumes kept), Cancel (abort in-flight). The
+    `/runs` list shows envState + quick Cancel/Retry/Stop/Start actions.
+- [x] vscode-server integration (see knecht-cloud)
+  - openvscode-server runs INSIDE each run's web container (staged once per
+    host, ~120MB, `server/daemon/ide.ts`; read-only bind mount in the ddev
+    override, `server/daemon/ddev.ts`). Served at `ide--<slug>.preview.<base>`
+    via `server/utils/ide-proxy.ts` (HTTP + a WebSocket pipe wired by
+    `server/plugins/ide-ws.ts`), session/membership gated. The run page's
+    "Code" button (`POST /api/runs/:id/ide`) opens it. The `ide` label is
+    reserved (`shared/utils/preview-host.ts`); tls-ask already canonical-checks
+    the `[<label>--]<slug>` form, so `ide--` certs work unchanged.
 - [ ] Idle-stop / archive / restore lifecycle (reapIdleEnvs, retention ladder)
 - [ ] DB dump upload + import (`ddev import-db`), shared folders
 - [ ] Framework detection chips (typo3/craft/laravel) on the launcher
-- [ ] Retry / reboot / cancel buttons on the run page
 
 ## Phase 6 (done, one manual step): publish the Docker image via GitHub Actions
 
@@ -450,22 +477,8 @@ changing the Phase 8 visibility model.
       project `_reference-project/knecht-cloud/` for the update workflow).
       Today the installer is one-shot; operators need documented steps for
       pulling a new image/tag and re-running `docker compose up -d`.
-
-The following run-control features need to be planned in a separate session
-(scope, schema impact, and UI placement are not yet decided):
-
-- Better .env editor: edit the run's env vars anytime, not just on preview
-  instance launch (today `envVars` is set once at `launch.post.ts` and
-  never editable after). Needs a re-apply path that rewrites the ddev
-  overrides and restarts the environment.
-- Git pull support: a command triggered when a branch is updated, so a run
-  can pick up new commits without a full re-launch. Needs a re-run path
-  that pulls inside the existing checkout and re-runs the start command.
-- Online VS Code IDE: already implemented in the reference project
-  (`_reference-project/knecht-cloud/`, code-server in a sidecar container
-  per run). Needs the same integration here: a launcher toggle, a sidecar
-  container in docker-compose, a route through the preview proxy, and a
-  "Open in VS Code" button on the run page.
+      (The online VS Code IDE is DONE, see Phase 5: it runs inside each run's
+      web container, not as a sidecar.)
 
 ## Phase 11: Clarify install modes for home / Mac mini hosting
 
