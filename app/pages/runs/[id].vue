@@ -314,23 +314,49 @@ async function copySshCommand() {
       v-if="run"
       class="flex flex-col gap-8"
     >
-      <div class="flex items-start justify-between">
+      <!-- Instance details -->
+      <div class="flex items-start justify-between border border-red-500">
         <div>
-          <div class="flex items-center gap-3">
-            <NuxtLink
+          <NuxtLink
               to="/runs"
               class="text-sm text-muted hover:text-toned"
             >
               ← Previews
             </NuxtLink>
+          <div class="flex items-center gap-3">
+            
             <h1 class="text-2xl font-bold text-highlighted">
               {{ run.fullName }}
             </h1>
+            <UBadge
+              v-if="run.visibility === 'public'"
+              color="success"
+              variant="subtle"
+              size="md"
+            >
+              public
+            </UBadge>
+            <UBadge
+              v-else-if="run.visibility === 'password'"
+              color="warning"
+              variant="subtle"
+              size="md"
+            >
+              password
+            </UBadge>
+            <UBadge
+              v-else
+              color="neutral"
+              variant="subtle"
+              size="md"
+            >
+              private
+            </UBadge>
           </div>
           <div class="mt-1 flex items-center gap-3 text-sm text-muted">
-            <span class="font-mono">{{ run.branch }}</span>
-            <span class="text-dimmed">#{{ run.id }}</span>
-            <span
+            <span class="font-mono">Branch: {{ run.branch }}</span>
+            <!-- <span class="text-dimmed">#{{ run.id }}</span>-->
+            <!-- <span
               class="flex items-center gap-1.5"
               :style="{ color: statusColor(run.status) }"
             >
@@ -340,32 +366,12 @@ async function copySshCommand() {
               />
               {{ run.status }}
             </span>
-            <UBadge
-              v-if="run.visibility === 'public'"
-              color="success"
-              variant="subtle"
-              size="sm"
-            >
-              public
-            </UBadge>
-            <UBadge
-              v-else-if="run.visibility === 'password'"
-              color="warning"
-              variant="subtle"
-              size="sm"
-            >
-              password
-            </UBadge>
-            <UBadge
-              v-else
-              color="neutral"
-              variant="subtle"
-              size="sm"
-            >
-              private
-            </UBadge>
+            -->
           </div>
         </div>
+      </div>
+
+      <div class="flex items-start justify-between">
         <div class="flex flex-wrap items-center justify-end gap-2">
           <UButton
             v-if="canCancel"
@@ -472,36 +478,23 @@ async function copySshCommand() {
         :hosts="run.previewHosts"
         :online="canOpen"
         :booting="isBooting"
+        class="max-h-[50vh]"
       />
+
+      <section class="k-card p-6">
+        <h2 class="text-lg font-semibold">
+          Log
+        </h2>
+        <pre class="k-mono mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-default bg-(--surface-base) p-4 text-2xs text-dimmed">{{ run.log || 'Waiting for the run to start…' }}</pre>
+      </section>
 
       <!-- Share + preview access -->
       <section class="k-card p-6">
         <h2 class="text-lg font-semibold">
-          Share
+          Visibility settings
         </h2>
-        <div class="mt-3 flex items-center gap-2">
-          <UInput
-            :model-value="previewUrl ?? ''"
-            readonly
-            class="k-mono flex-1"
-            block
-          />
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="sm"
-            icon="i-lucide-copy"
-            :disabled="!previewUrl"
-            @click="copyPreviewUrl"
-          >
-            Copy
-          </UButton>
-        </div>
-        <p class="mt-2 text-2xs text-dimmed">
-          {{ shareHint }}
-        </p>
 
-        <div class="mt-6 flex flex-col gap-4 border-t border-default pt-5">
+        <div class="mt-6 flex flex-col gap-4  ">
           <UFormField
             label="Who can view this preview?"
             class="max-w-md"
@@ -559,6 +552,28 @@ async function copySshCommand() {
             </span>
           </div>
         </div>
+
+        <div class="mt-3 flex items-center gap-2 border-t border-default pt-5">
+          <UInput
+            :model-value="previewUrl ?? ''"
+            readonly
+            class="k-mono flex-1"
+            block
+          />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            icon="i-lucide-copy"
+            :disabled="!previewUrl"
+            @click="copyPreviewUrl"
+          >
+            Copy
+          </UButton>
+        </div>
+        <p class="mt-2 text-2xs text-dimmed">
+          {{ shareHint }}
+        </p>
       </section>
 
       <section class="k-card p-6">
@@ -598,7 +613,7 @@ async function copySshCommand() {
       <section class="k-card p-6">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">
-            Post-pull commands
+            Post pull commands
           </h2>
           <UButton
             color="primary"
@@ -635,25 +650,6 @@ async function copySshCommand() {
             Saved
           </span>
         </div>
-      </section>
-
-      <section class="k-card p-6">
-        <h2 class="text-lg font-semibold">
-          Boot log
-        </h2>
-        <pre class="k-mono mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-default bg-(--surface-base) p-4 text-2xs text-dimmed">{{ run.log || 'Waiting for the run to start…' }}</pre>
-      </section>
-
-      <section class="k-card p-6">
-        <h2 class="text-lg font-semibold">
-          Environment
-        </h2>
-        <p class="mt-1 text-2xs text-dimmed">
-          Boot-time environment variables were set at launch and are applied when the environment boots or reboots.
-        </p>
-        <p class="mt-2 text-2xs text-dimmed">
-          To change the project's <span class="k-mono">.env</span> file, open the integrated VS Code and edit it there. The file is the real, mounted checkout, so changes take effect immediately for the app.
-        </p>
       </section>
     </div>
 
