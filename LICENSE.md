@@ -1,6 +1,6 @@
 # Quick DDEV Previews
 
-A fork of [Knecht Cloud](https://github.com/knecht-works/knecht-cloud/) created by Samuel Reichör / knecht-works.
+A fork of [Knecht Cloud](https://github.com/knecht-works/knecht-cloud/) created by Samuel Reichör / knecht-works, licensed as FSL-1.1-ALv2.
 
 Significant changes made, amongst others:
 
