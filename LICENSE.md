@@ -2,9 +2,7 @@
 
 A fork of [Knecht Cloud](https://github.com/knecht-works/knecht-cloud/) created by Samuel Reichör / knecht-works.
 
-## Overview
-
-Significant changes made:
+Significant changes made, amongst others:
 
 - Added a "create preview" feature, strip other features
 - Add support for sslip.io, so no external domain required on install
@@ -19,7 +17,7 @@ Significant changes made:
 
 FSL-1.1-ALv2
 
-## Original Work Notice
+## Original Work & Notice
 
 This project is a derivative work based on [Knecht Cloud]([https://github.com/upstream/original-project](https://github.com/knecht-works/knecht-cloud/)) created by [Samuel Reichör / knecht-works].)
 
