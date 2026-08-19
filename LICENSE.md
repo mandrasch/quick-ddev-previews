@@ -1,6 +1,6 @@
 # Quick DDEV Previews
 
-> A fork of [Knecht Cloud]([https://github.com/upstream/original-project](https://github.com/knecht-works/knecht-cloud/)) created by [Samuel Reichör / knecht-works].
+A fork of [Knecht Cloud](https://github.com/knecht-works/knecht-cloud/) created by Samuel Reichör / knecht-works.
 
 ## Overview
 
