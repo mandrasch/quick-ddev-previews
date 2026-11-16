@@ -1,3 +1,13 @@
+Knecht Cloud added the support for public previews in [v0.19.0](https://github.com/knecht-works/knecht-cloud/releases/tag/v0.19.0):
+
+> "Share previews without a login. Previews can now be public, globally or per project, ..."
+
+Sslip.io support was added as FR to Knecht (https://github.com/knecht-works/knecht-cloud/issues/10)
+
+Therefore I'll archive this repository in near future, please switch to the official Knecht Cloud installation.
+
+<hr>
+
 # Quick DDEV previews
 
 A self-hosted service for generating DDEV preview environments. Install it on a Cloud VPS or a MacMini, connect GitHub repositories and launch quick DDEV previews of any branch - which can be shared securely with testers, clients or coworkers.
